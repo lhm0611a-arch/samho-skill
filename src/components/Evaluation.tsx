@@ -647,7 +647,7 @@ export default function Evaluation() {
                 <option value="">평가 대상 없음</option>
               )}
               {filteredCandidates.map((c) => {
-                let label = `[${c.app_no}] ${c.name} (${c.eval_date || "미응시"})`;
+                let label = `[${c.app_no}] ${c.name?.toUpperCase()} (${c.eval_date || "미응시"})`;
                 const myLog = globalLogs.find(
                   (l) =>
                     String(l.app_no) === String(c.app_no) &&
@@ -677,7 +677,7 @@ export default function Evaluation() {
           <div className="flex items-center gap-1 sm:gap-2">
             <span className="text-slate-400 font-bold hidden sm:inline">이름</span>
             <span className="font-black text-slate-100 text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[60px] sm:max-w-none">
-              {currentCandidate?.name || "-"}
+              {currentCandidate?.name?.toUpperCase() || "-"}
             </span>
           </div>
           <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>

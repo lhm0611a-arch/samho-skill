@@ -144,7 +144,11 @@ app.post('/api/tts', async (req, res) => {
     }
   } catch (error: any) {
     console.error('Error generating TTS:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate TTS' });
+    let errorMessage = error.message || '음성 합성에 실패했습니다.';
+    if (errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+      errorMessage = '음성 합성 모델(gemini-3.1-flash-tts)의 일일 무료 제공량을 초과했습니다. 잠시 후 다시 시도해주시거나, 유료 플랜으로 업그레이드 해야 합니다.';
+    }
+    res.status(500).json({ error: errorMessage });
   }
 });
 

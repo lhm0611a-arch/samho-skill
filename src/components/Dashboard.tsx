@@ -113,7 +113,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="h-full overflow-y-auto flex flex-col p-2 lg:p-4 animate-in fade-in max-w-[1600px] mx-auto relative z-10">
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-2 lg:p-4 animate-in fade-in max-w-[1600px] mx-auto w-full relative z-10">
         <div className="shrink-0">
             {/* Filters */}
             <div className="mb-3 flex flex-wrap gap-3 md:gap-4 items-center justify-between dx-card px-3 md:px-4 py-2 border-t-4 border-t-blue-500">

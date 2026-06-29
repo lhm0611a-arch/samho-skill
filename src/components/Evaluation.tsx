@@ -580,7 +580,7 @@ export default function Evaluation() {
       : currentCandidate.s_status === "완료");
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in bg-[#030f1c]">
+    <div className="flex-1 min-h-0 flex flex-col animate-in fade-in bg-[#030f1c]">
       <div className="bg-[#051326] border-b border-[#1e3a5f] px-3 md:px-5 py-2 md:py-3 flex flex-col xl:flex-row gap-3 md:gap-4 xl:items-center shrink-0 z-30 relative shadow-sm">
         <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 w-full xl:w-auto shrink-0">
           <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 w-full lg:w-auto shrink-0">
@@ -714,7 +714,7 @@ export default function Evaluation() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-3 md:gap-4 p-3 md:p-4 max-w-[1800px] mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col md:flex-row gap-3 md:gap-4 p-3 md:p-4 max-w-[1800px] mx-auto w-full">
         <div
           className={`dx-card ${userRole === "interviewer" ? "w-full" : "w-full md:w-5/12"} flex-[1] md:flex-none flex flex-col relative min-h-0 overflow-hidden bg-[#08172c]`}
         >

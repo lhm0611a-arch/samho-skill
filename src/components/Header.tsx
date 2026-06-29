@@ -48,7 +48,7 @@ export default function Header() {
       <div className="absolute bottom-0 left-0 w-full h-[3px] bg-hd-green"></div>
       
       <div className="flex items-center gap-2 sm:gap-4 w-auto md:w-1/3 shrink-0">
-          <div className="bg-white p-1 rounded-sm shadow-sm hidden sm:block">
+          <div className="hidden sm:block">
             <img src="/ci.png" alt="HD현대삼호" className="h-6 object-contain" onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
           </div>
           <span className="hidden font-black text-hd-green tracking-tighter text-lg">HD현대삼호</span>

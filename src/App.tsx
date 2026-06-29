@@ -16,7 +16,7 @@ function MainApp() {
   return (
     <div className="font-kor h-screen flex flex-col selection:bg-[#00a859]/30 selection:text-white relative bg-[#030f1c] text-slate-200">
       <Header />
-      <main className="flex-1 overflow-hidden relative">
+      <main className="flex-1 overflow-hidden relative flex flex-col min-h-0">
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'evaluation' && <Evaluation />}
         {currentView === 'admin' && <Admin />}

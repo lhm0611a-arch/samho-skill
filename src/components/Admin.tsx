@@ -346,7 +346,7 @@ export default function Admin() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-8 bg-[#030f1c] animate-in fade-in">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 bg-[#030f1c] animate-in fade-in">
         <div className="max-w-[1400px] mx-auto space-y-6">
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

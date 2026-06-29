@@ -40,9 +40,10 @@ app.post('/api/generate-questions', async (req, res) => {
         contents: prompt,
       });
     } catch (err: any) {
-      console.warn('First attempt failed, retrying with gemini-3.1-pro-preview...', err.message);
+      console.warn('First attempt failed, retrying with gemini-3.5-flash...', err.message);
+      await new Promise(r => setTimeout(r, 2000));
       response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
+        model: 'gemini-3.5-flash',
         contents: prompt,
       });
     }
@@ -109,6 +110,30 @@ app.post('/api/tts', async (req, res) => {
     }
 
     if (audioBase64) {
+      if (mimeType.includes('audio/l16') || mimeType.includes('audio/pcm')) {
+        const pcmBuffer = Buffer.from(audioBase64, 'base64');
+        const sampleRate = 24000;
+        const numChannels = 1;
+        const wavHeader = Buffer.alloc(44);
+        
+        wavHeader.write('RIFF', 0);
+        wavHeader.writeUInt32LE(36 + pcmBuffer.length, 4);
+        wavHeader.write('WAVE', 8);
+        wavHeader.write('fmt ', 12);
+        wavHeader.writeUInt32LE(16, 16);
+        wavHeader.writeUInt16LE(1, 20); // PCM
+        wavHeader.writeUInt16LE(numChannels, 22);
+        wavHeader.writeUInt32LE(sampleRate, 24);
+        wavHeader.writeUInt32LE(sampleRate * numChannels * 2, 28);
+        wavHeader.writeUInt16LE(numChannels * 2, 32);
+        wavHeader.writeUInt16LE(16, 34);
+        wavHeader.write('data', 36);
+        wavHeader.writeUInt32LE(pcmBuffer.length, 40);
+
+        const wavBuffer = Buffer.concat([wavHeader, pcmBuffer]);
+        audioBase64 = wavBuffer.toString('base64');
+        mimeType = 'audio/wav';
+      }
       res.json({ audioBase64, mimeType });
     } else {
       res.status(500).json({ error: 'Failed to generate audio output from model.' });

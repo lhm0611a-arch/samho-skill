@@ -13,6 +13,8 @@ export default function Admin() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [uploadType, setUploadType] = useState('사전기량검증');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgressMsg, setUploadProgressMsg] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerateQuestions = async () => {
@@ -89,8 +91,10 @@ export default function Admin() {
           return json.slice(startIndex).map((r, index) => {
             try {
               if (!r || r.length < 2) return null;
-              const appNoRaw = r[1] !== undefined ? String(r[1]).trim() : '';
+              let appNoRaw = r[1] !== undefined ? String(r[1]).trim() : '';
               if (appNoRaw === '') return null;
+              
+              appNoRaw = appNoRaw.toUpperCase().replace(/[\s-]/g, '').replace(/([A-Z]+)(\d+)/, '$1-$2');
               
               let e9Str = (r[5] || 'X').toString().toUpperCase().trim();
               let e9 = (['O', '0', 'YES', '○'].some(k => e9Str.includes(k))) ? 'O' : 'X';
@@ -129,7 +133,7 @@ export default function Admin() {
               let s_fit = parseInt(r[17]) || 0;
               let s_weld = parseInt(r[19]) || 0;
 
-              const candidateName = r[3] !== undefined && String(r[3]).trim() !== '' ? String(r[3]).trim() : '이름없음';
+              const candidateName = r[3] !== undefined && String(r[3]).trim() !== '' ? String(r[3]).toUpperCase().trim() : '이름없음';
               const evalType = normalizeType(typeName);
 
               return {
@@ -201,6 +205,7 @@ export default function Admin() {
         }
 
         if (gasUrl && gasUrl.trim() !== '') {
+            setIsUploading(true);
             try {
                 const preList = newCandidates.filter(c => c.eval_type === '사전기량검증' || c.eval_type === '사전');
                 const mainList = newCandidates.filter(c => c.eval_type === '본기량검증' || c.eval_type === '본');
@@ -212,7 +217,7 @@ export default function Admin() {
                 const sendData = async (list: any[], typeName: string) => {
                     for (let i = 0; i < list.length; i += CHUNK_SIZE) {
                         currentChunk++;
-                        // UI Notification logic
+                        setUploadProgressMsg(`명단 전송 중... (${currentChunk}/${totalChunks})`);
                         const chunk = list.slice(i, i + CHUNK_SIZE);
                         const payloadData = chunk.map(c => ({
                             no: c.no,
@@ -257,7 +262,10 @@ export default function Admin() {
                 
                 if (newLogs.length > 0) {
                     const LOG_CHUNK = 50;
+                    const totalLogChunks = Math.ceil(newLogs.length / LOG_CHUNK);
                     for (let i = 0; i < newLogs.length; i += LOG_CHUNK) {
+                        const currentLogChunk = Math.floor(i / LOG_CHUNK) + 1;
+                        setUploadProgressMsg(`로그 전송 중... (${currentLogChunk}/${totalLogChunks})`);
                         const chunk = newLogs.slice(i, i + LOG_CHUNK);
                         await fetch(gasUrl, {
                             method: 'POST',
@@ -278,6 +286,9 @@ export default function Admin() {
 
             } catch(e: any){
                 alert('서버 연동 오류: ' + e.message);
+            } finally {
+                setIsUploading(false);
+                setUploadProgressMsg("");
             }
         } else {
             const existingUids = new Set(candidates.map(c => c.uid));
@@ -324,7 +335,8 @@ export default function Admin() {
 
   const handleClearAll = () => {
       const pw = prompt("모든 로컬 데이터가 삭제됩니다. 관리자 마스터 키를 입력하세요:");
-      if (pw === '1234') { // Admin hash fallback check, keep simple for demo
+      const adminPw = import.meta.env.VITE_ADMIN_PASSWORD || '1234';
+      if (pw === adminPw) {
           setCandidates([]);
           setGlobalLogs([]);
           localStorage.removeItem('hd_candidates');
@@ -402,9 +414,20 @@ export default function Admin() {
                             accept=".xlsx,.xls" 
                             onChange={handleFileUpload} 
                             ref={fileInputRef}
+                            disabled={isUploading}
                         />
-                        <label htmlFor="file-upload" className="dx-btn-success cursor-pointer px-6 py-3 flex-1 flex items-center justify-center gap-2 border border-emerald-400 shadow-[0_0_10px_rgba(34,211,238,0.2)] hover:shadow-emerald-400/50 transition-all">
-                            <FileSpreadsheet className="w-5 h-5 text-emerald-400" /> <span className="font-black tracking-wide text-sm">명단 데이터 업로드 (.xlsx)</span>
+                        <label htmlFor={isUploading ? "" : "file-upload"} className={`px-6 py-3 flex-1 flex items-center justify-center gap-2 border shadow-[0_0_10px_rgba(34,211,238,0.2)] transition-all ${isUploading ? 'bg-slate-700 border-slate-500 cursor-not-allowed text-slate-400' : 'dx-btn-success cursor-pointer border-emerald-400 hover:shadow-emerald-400/50'}`}>
+                            {isUploading ? (
+                                <>
+                                    <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+                                    <span className="font-black tracking-wide text-sm">{uploadProgressMsg || '업로드 중...'}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <FileSpreadsheet className="w-5 h-5 text-emerald-400" /> 
+                                    <span className="font-black tracking-wide text-sm">명단 데이터 업로드 (.xlsx)</span>
+                                </>
+                            )}
                         </label>
                     </div>
 

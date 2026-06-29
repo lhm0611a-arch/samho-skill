@@ -16,16 +16,19 @@ export default function LoginOverlay() {
       alert("본인의 실명을 입력해주십시오.");
       return;
     }
-    const hashed = await hashPassword(code.trim());
     
-    // 9999 -> interviewer
-    if (hashed === '94b4cfbf67406a466487ffdf3dc0beabf2df471a28a2b535d826a70e17f09312') {
+    const inputCode = code.trim();
+    const hashed = await hashPassword(inputCode);
+    
+    const interviewerPw = import.meta.env.VITE_INTERVIEWER_PASSWORD || '9999';
+    const evaluatorPw = import.meta.env.VITE_EVALUATOR_PASSWORD || '5678';
+    
+    if (inputCode === interviewerPw || hashed === '94b4cfbf67406a466487ffdf3dc0beabf2df471a28a2b535d826a70e17f09312') {
       setUserRole('interviewer');
       setEvaluatorName(evaluator.trim());
       setCurrentView('evaluation');
     }
-    // 5678 -> evaluator
-    else if (hashed === '1714fc2a7008cb01bb1df34825d19c0b5f10b0e9bbafe884fb7d704ba416c148') {
+    else if (inputCode === evaluatorPw || hashed === '1714fc2a7008cb01bb1df34825d19c0b5f10b0e9bbafe884fb7d704ba416c148') {
       setUserRole('evaluator');
       setEvaluatorName(evaluator.trim());
       setCurrentView('evaluation');
@@ -35,9 +38,11 @@ export default function LoginOverlay() {
   };
 
   const handleAdminLogin = async () => {
-    const hashed = await hashPassword(adminCode.trim());
-    // 1234 -> admin
-    if (hashed === '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4') {
+    const inputCode = adminCode.trim();
+    const hashed = await hashPassword(inputCode);
+    const adminPw = import.meta.env.VITE_ADMIN_PASSWORD || '1234';
+
+    if (inputCode === adminPw || hashed === '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4') {
       setUserRole('admin');
       setEvaluatorName('Admin');
       setCurrentView('admin');
@@ -47,7 +52,7 @@ export default function LoginOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900 bg-cover bg-center animate-in fade-in duration-500 font-kor" style={{ backgroundImage: "url('/yard.png')" }}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900 bg-cover bg-center animate-in fade-in duration-500 font-kor" style={{ backgroundImage: "url('/yard.jpg')" }}>
       {/* Premium dark overlay with gradient matching the reference */}
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[4px]"></div>
       

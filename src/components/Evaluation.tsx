@@ -290,7 +290,9 @@ export default function Evaluation() {
       const data = await response.json();
 
       if (data.error) {
+        console.error("TTS Error:", data.error);
         alert("음성 합성 오류: " + data.error);
+        setPlayingTTS(null);
         return;
       }
 
@@ -298,10 +300,22 @@ export default function Evaluation() {
         const audio = new Audio(
           `data:${data.mimeType || "audio/wav"};base64,${data.audioBase64}`,
         );
-        audio.play();
-        audio.onended = () => setPlayingTTS(null);
+        try {
+          await audio.play();
+          audio.onended = () => setPlayingTTS(null);
+          audio.onerror = (e) => {
+            console.error("Audio playback error:", e);
+            setPlayingTTS(null);
+          };
+        } catch(e) {
+          console.error("Audio play blocked/failed:", e);
+          setPlayingTTS(null);
+        }
+      } else {
+        setPlayingTTS(null);
       }
     } catch (e: any) {
+      console.error("TTS fetch error:", e);
       alert("음성 재생 중 오류가 발생했습니다.");
       setPlayingTTS(null);
     }
@@ -659,38 +673,38 @@ export default function Evaluation() {
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-between xl:justify-start gap-2 md:gap-4 overflow-x-auto hide-scrollbar whitespace-nowrap bg-[#08172c] border border-[#1e3a5f] rounded-xl px-3 md:px-5 py-2.5 text-xs md:text-sm shadow-inner w-full">
-          <div className="flex items-center gap-2 md:gap-2.5">
-            <span className="text-slate-400 font-bold">이름</span>
-            <span className="font-black text-slate-100 text-sm md:text-base">
+        <div className="flex-1 flex items-center justify-between xl:justify-start gap-1 sm:gap-2 md:gap-3 xl:gap-4 overflow-hidden whitespace-nowrap bg-[#08172c] border border-[#1e3a5f] rounded-xl px-2 sm:px-3 md:px-4 lg:px-5 py-2 text-[10px] sm:text-xs md:text-sm shadow-inner w-full">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className="text-slate-400 font-bold hidden sm:inline">이름</span>
+            <span className="font-black text-slate-100 text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[60px] sm:max-w-none">
               {currentCandidate?.name || "-"}
             </span>
           </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700"></div>
-          <div className="flex items-center gap-2 md:gap-2.5">
-            <span className="text-slate-400 font-bold">나이</span>
-            <span className="font-bold text-blue-400 text-sm md:text-base">
+          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className="text-slate-400 font-bold hidden sm:inline">나이</span>
+            <span className="font-bold text-blue-400 text-[11px] sm:text-xs md:text-sm lg:text-base">
               {currentCandidate
-                ? `${currentCandidate.age} / ${currentCandidate.dob ? new Date(currentCandidate.dob).getFullYear() : "-"}`
+                ? `${currentCandidate.age}/${currentCandidate.dob ? new Date(currentCandidate.dob).getFullYear() : "-"}`
                 : "-"}
             </span>
           </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700"></div>
-          <div className="flex items-center gap-2 md:gap-2.5">
-            <span className="text-slate-400 font-bold">E-9</span>
-            <span className="font-bold text-blue-400 text-sm md:text-base">
+          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className="text-slate-400 font-bold hidden sm:inline">E-9</span>
+            <span className="font-bold text-blue-400 text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[40px] sm:max-w-none">
               {currentCandidate?.e9 || "-"}
             </span>
           </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700"></div>
-          <div className="flex items-center gap-2 md:gap-2.5">
-            <span className="text-slate-400 font-bold">직종</span>
-            <span className="font-black text-hd-green text-sm md:text-base">
+          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className="text-slate-400 font-bold hidden sm:inline">직종</span>
+            <span className="font-black text-hd-green text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[50px] sm:max-w-none">
               {currentCandidate?.job || "-"}
             </span>
           </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700"></div>
-          <span className="scale-90 md:scale-100 origin-left"
+          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
+          <span className="scale-75 sm:scale-90 lg:scale-100 origin-left shrink-0"
             dangerouslySetInnerHTML={{
               __html: currentCandidate
                 ? getBadgeHtml(currentCandidate.eval_type)

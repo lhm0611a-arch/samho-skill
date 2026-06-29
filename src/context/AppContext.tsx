@@ -122,7 +122,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const res = (d.result && d.result !== '대기' && d.result !== '') ? d.result : determineResult(tempP);
 
         return {
-            ...d, 
+            ...d,
+            name: (d.name || '').toUpperCase(),
             id: String(d.app_no), 
             uid: d.app_no+'_'+d.name+'_'+fDate+'_'+eType, 
             eval_type: eType,

@@ -303,7 +303,7 @@ export default function Dashboard() {
                               <tr key={c.uid} className="hover:bg-slate-800/50 cursor-pointer transition-colors" onClick={() => setSelectedCandidate(c)}>
                                   <td className="text-center px-1 md:px-2" dangerouslySetInnerHTML={{__html: getBadgeHtml(c.eval_type)}}></td>
                                   <td className="font-bold text-slate-300 text-center tracking-wider text-xs md:text-sm px-1 md:px-2">{c.app_no}</td>
-                                  <td className="font-black text-slate-100 text-center text-xs md:text-sm px-1 md:px-2">{c.name}</td>
+                                  <td className="font-black text-slate-100 text-center text-xs md:text-sm px-1 md:px-2">{c.name?.toUpperCase()}</td>
                                   <td className="text-slate-400 text-center font-bold text-xs md:text-sm px-1 md:px-2">{c.job}</td>
                                   <td className="text-slate-400 text-xs md:text-sm text-center font-bold px-1 md:px-2">{c.age} / <span className={c.e9 === 'O' ? 'text-blue-400 font-black' : 'text-slate-600'}>{c.e9}</span></td>
                                   <td className="text-center font-black text-blue-400 text-xs md:text-sm px-1 md:px-2">{(c.k_score || 0) > 0 ? c.k_score : '-'}</td>
@@ -336,7 +336,7 @@ export default function Dashboard() {
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 p-3 md:p-4 rounded-xl bg-[#051326] border border-[#1e3a5f]">
                             <div>
                                 <div className="flex items-center gap-2 md:gap-3 mb-1.5 md:mb-2">
-                                    <h4 className="text-lg md:text-xl lg:text-2xl font-black text-slate-100">{selectedCandidate.name}</h4>
+                                    <h4 className="text-lg md:text-xl lg:text-2xl font-black text-slate-100">{selectedCandidate.name?.toUpperCase()}</h4>
                                     <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-lg text-xs md:text-sm font-bold text-slate-300 tracking-wider">{selectedCandidate.app_no}</span>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm font-bold text-slate-400 mt-2 md:mt-3">

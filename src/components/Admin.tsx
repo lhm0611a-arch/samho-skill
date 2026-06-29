@@ -366,9 +366,6 @@ export default function Admin() {
                     </div>
 
                     <div className="flex flex-col gap-3 pt-4 border-t border-[#1e3a5f]">
-                        <button onClick={fetchData} className="dx-btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 shadow-sm bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors">
-                            <RefreshCw className="w-4 h-4" /> 클라우드 데이터 불러오기
-                        </button>
                         <button onClick={handleClearAll} className="bg-red-900/20 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white w-full py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
                             <Trash2 className="w-4 h-4" /> 시스템 로컬 초기화
                         </button>

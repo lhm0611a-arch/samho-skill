@@ -34,18 +34,22 @@ app.post('/api/generate-questions', async (req, res) => {
 총 ${count}개의 질문만 반환해주세요.`;
 
     let response;
-    try {
-      response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: prompt,
-      });
-    } catch (err: any) {
-      console.warn('First attempt failed, retrying with gemini-3.5-flash...', err.message);
-      await new Promise(r => setTimeout(r, 2000));
-      response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: prompt,
-      });
+    let retries = 3;
+    let delay = 2000;
+    while (retries > 0) {
+      try {
+        response = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: prompt,
+        });
+        break; // Success
+      } catch (err: any) {
+        console.warn(`Attempt failed (${retries} left), retrying with gemini-3.5-flash in ${delay}ms...`, err.message);
+        retries--;
+        if (retries === 0) throw err;
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2; // Exponential backoff
+      }
     }
 
     const text = response.text || '';

@@ -79,12 +79,15 @@ export function normalizeJob(raw: any): string {
 export function normalizeDob(raw: any): string {
   if (raw === undefined || raw === null) return '';
 
-  // 1. 엑셀 숫자 시리얼 날짜 처리
-  if (typeof raw === 'number') {
-    if (raw > 10000 && raw < 80000) {
-      const date = new Date(Math.round((raw - 25569) * 86400 * 1000));
-      if (!isNaN(date.getTime())) {
-        const y = date.getUTCFullYear();
+  const currentYear = new Date().getFullYear();
+
+  // 1. 숫자형 또는 5자리 숫자 문자열 (엑셀 시리얼 날짜: 15000~50000 은 1941년~2036년 해당)
+  const numVal = typeof raw === 'number' ? raw : (typeof raw === 'string' && /^\d{5}$/.test(raw.trim()) ? Number(raw.trim()) : null);
+  if (numVal !== null && numVal >= 15000 && numVal <= 50000) {
+    const date = new Date(Math.round((numVal - 25569) * 86400 * 1000));
+    if (!isNaN(date.getTime())) {
+      const y = date.getUTCFullYear();
+      if (y >= 1950 && y <= currentYear) {
         const m = String(date.getUTCMonth() + 1).padStart(2, '0');
         const d = String(date.getUTCDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
@@ -97,10 +100,12 @@ export function normalizeDob(raw: any): string {
 
   // 2. 8자리 숫자 (YYYYMMDD) 예: 19820611, 20060304
   if (/^\d{8}$/.test(s)) {
-    const y = s.substring(0, 4);
+    const y = parseInt(s.substring(0, 4), 10);
     const m = s.substring(4, 6);
     const d = s.substring(6, 8);
-    return `${y}-${m}-${d}`;
+    if (y >= 1940 && y <= currentYear) {
+      return `${y}-${m}-${d}`;
+    }
   }
 
   // 3. 6자리 숫자 (YYMMDD) 예: 820611, 060304, 951130
@@ -109,47 +114,80 @@ export function normalizeDob(raw: any): string {
     const m = s.substring(2, 4);
     const d = s.substring(4, 6);
     const fullYear = yy <= 40 ? 2000 + yy : 1900 + yy;
-    return `${fullYear}-${m}-${d}`;
+    if (fullYear >= 1940 && fullYear <= currentYear) {
+      return `${fullYear}-${m}-${d}`;
+    }
   }
 
-  // 4. 구분자가 있는 4자리 연도: YYYY[./-]MM[./-]DD, YYYY[./-]M[./-]D
+  // 4. 5자리 숫자 중 앞자리 0이 누락된 YYMMDD (예: 50616 -> 050616 -> 2005-06-16)
+  if (/^\d{5}$/.test(s)) {
+    const padded = '0' + s;
+    const yy = parseInt(padded.substring(0, 2), 10);
+    const m = parseInt(padded.substring(2, 4), 10);
+    const d = parseInt(padded.substring(4, 6), 10);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const fullYear = 2000 + yy;
+      if (fullYear <= currentYear) {
+        return `${fullYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+  }
+
+  // 5. 구분자가 있는 4자리 연도: YYYY[./-]MM[./-]DD, YYYY[./-]M[./-]D
   const match4 = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
   if (match4) {
-    const y = match4[1];
+    const y = parseInt(match4[1], 10);
     const m = match4[2].padStart(2, '0');
     const d = match4[3].padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    if (y >= 1940 && y <= currentYear) {
+      return `${y}-${m}-${d}`;
+    }
   }
 
-  // 5. 구분자가 있는 2자리 연도: YY[./-]MM[./-]DD, YY[./-]M[./-]D (예: 82-06-11, 82.06.11)
+  // 6. 구분자가 있는 2자리 연도: YY[./-]MM[./-]DD, YY[./-]M[./-]D (예: 82-06-11, 82.06.11)
   const match2 = s.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})/);
   if (match2) {
     const yy = parseInt(match2[1], 10);
     const m = match2[2].padStart(2, '0');
     const d = match2[3].padStart(2, '0');
     const fullYear = yy <= 40 ? 2000 + yy : 1900 + yy;
-    return `${fullYear}-${m}-${d}`;
+    if (fullYear >= 1940 && fullYear <= currentYear) {
+      return `${fullYear}-${m}-${d}`;
+    }
   }
 
-  // 6. 유럽/영미식 DD.MM.YYYY or DD/MM/YYYY
+  // 7. 유럽/영미식 DD.MM.YYYY or DD/MM/YYYY
   const matchEuro = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
   if (matchEuro) {
     const d = matchEuro[1].padStart(2, '0');
     const m = matchEuro[2].padStart(2, '0');
-    const y = matchEuro[3];
-    return `${y}-${m}-${d}`;
+    const y = parseInt(matchEuro[3], 10);
+    if (y >= 1940 && y <= currentYear) {
+      return `${y}-${m}-${d}`;
+    }
   }
 
-  // 7. 일반 Date 파싱
+  // 8. 4자리 출생연도만 입력된 경우 (예: 1986)
+  if (/^\d{4}$/.test(s)) {
+    const y = parseInt(s, 10);
+    if (y >= 1940 && y <= currentYear) {
+      return `${y}-01-01`;
+    }
+  }
+
+  // 9. 일반 Date 파싱 (1940 ~ 현재연도 범위만 인정)
   const parsed = new Date(s);
-  if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1920 && parsed.getFullYear() < 2100) {
+  if (!isNaN(parsed.getTime())) {
     const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    if (y >= 1940 && y <= currentYear) {
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
   }
 
-  return s.split(/[ T]/)[0].replace(/\./g, '-');
+  // 유효하지 않은 날짜(예: 56166, 전화번호, 텍스트 등)는 빈 문자열로 정돈
+  return '';
 }
 
 /**
@@ -158,6 +196,7 @@ export function normalizeDob(raw: any): string {
 export function calculateAge(dobStr: string, refDate: Date = new Date()): number {
   if (!dobStr) return 0;
   const normalized = normalizeDob(dobStr);
+  if (!normalized) return 0;
   const parts = normalized.split('-');
   if (parts.length < 3) return 0;
   const birthYear = parseInt(parts[0], 10);
@@ -173,7 +212,7 @@ export function calculateAge(dobStr: string, refDate: Date = new Date()): number
   if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
     age--;
   }
-  return age >= 0 ? age : 0;
+  return (age >= 10 && age <= 90) ? age : 0;
 }
 
 /**

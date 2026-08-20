@@ -162,12 +162,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const appNo = normalizeAppNo(d.app_no);
         const candName = normalizeName(d.name);
         const job = normalizeJob(d.job);
-        const dob = normalizeDob(d.dob);
+        let dob = normalizeDob(d.dob);
         const e9 = normalizeE9(d.e9);
         let age = calculateAge(dob);
         if (age === 0 && d.age) {
-          const parsedAge = Number(d.age);
-          if (!isNaN(parsedAge) && parsedAge > 0) age = parsedAge;
+          const parsedAge = parseInt(String(d.age).replace(/[^0-9]/g, ''), 10);
+          if (!isNaN(parsedAge) && parsedAge >= 10 && parsedAge <= 90) {
+            age = parsedAge;
+          }
+        }
+        if (age > 0 && (!dob || dob.length < 10)) {
+          dob = `${new Date().getFullYear() - age}-01-01`;
         }
         
         let k = Number(d.k_score) || 0;

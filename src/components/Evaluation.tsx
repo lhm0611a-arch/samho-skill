@@ -757,7 +757,7 @@ export default function Evaluation() {
           name: String(p.raw_name || p.name || "").trim(),
           job: String(p.job || "").trim(),
           dob: String(p.dob || "").trim(),
-          age: Number(p.age) || 0,
+          age: (Number(p.age) || 0) > 0 ? Number(p.age) : (p.dob ? calculateAge(p.dob) : 0),
           e9: String(p.e9 || "X").trim(),
           country: String(p.country || "").trim(),
           agency: String(p.agency || "").trim(),

@@ -506,9 +506,9 @@ export default function Evaluation() {
   };
 
   const [playingTTS, setPlayingTTS] = useState<string | null>(null);
-  const [selectedVoice, setSelectedVoice] = useState<'Puck' | 'Fenrir' | 'Aoede' | 'Kore'>(() => {
-    const v = getTTSVoice() as any;
-    if (v === 'Puck' || v === 'Fenrir' || v === 'Aoede' || v === 'Kore') return v;
+  const [selectedVoice, setSelectedVoice] = useState<'Puck' | 'Aoede'>(() => {
+    const v = getTTSVoice();
+    if (v === 'Puck' || v === 'Aoede') return v;
     return 'Puck';
   });
 
@@ -1097,9 +1097,26 @@ export default function Evaluation() {
           <div className="flex items-center gap-1 sm:gap-2">
             <span className="text-slate-400 font-bold hidden sm:inline">나이</span>
             <span className="font-bold text-blue-400 text-[11px] sm:text-xs md:text-sm lg:text-base">
-              {currentCandidate
-                ? `${currentCandidate.age}/${currentCandidate.dob ? new Date(currentCandidate.dob).getFullYear() : "-"}`
-                : "-"}
+              {(() => {
+                if (!currentCandidate) return "-";
+                const ageVal = Number(currentCandidate.age) || 0;
+                const dobStr = currentCandidate.dob || "";
+                let birthYear = "";
+                if (dobStr.includes("-")) {
+                  const y = dobStr.split("-")[0];
+                  if (/^\d{4}$/.test(y)) birthYear = y;
+                } else if (/^\d{4}$/.test(dobStr)) {
+                  birthYear = dobStr;
+                }
+                if (ageVal > 0 && birthYear) {
+                  return `${ageVal}세 (${birthYear}년생)`;
+                } else if (ageVal > 0) {
+                  return `${ageVal}세`;
+                } else if (birthYear) {
+                  return `${birthYear}년생`;
+                }
+                return "-";
+              })()}
             </span>
           </div>
           <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
@@ -1139,17 +1156,15 @@ export default function Evaluation() {
               <select
                 value={selectedVoice}
                 onChange={(e) => {
-                  const v = e.target.value as any;
+                  const v = e.target.value as 'Puck' | 'Aoede';
                   setSelectedVoice(v);
                   setTTSVoice(v);
                 }}
-                className="bg-[#0a1b35] text-[11px] md:text-xs font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-2 py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors"
-                title="AI 음성 선택 (한 번 재생 시 서버에 자동 저장되어 토큰 소모 없이 모든 기기에서 공유)"
+                className="bg-[#0a1b35] text-[11px] md:text-xs font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-2.5 py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors"
+                title="AI 음성 선택 (남성 / 여성)"
               >
-                <option value="Puck">👨 AI 남성 (기본 - 친절/명확)</option>
-                <option value="Fenrir">👨 AI 남성 (신뢰감/중후한 톤)</option>
-                <option value="Aoede">👩 AI 여성 (자연스러운 억양)</option>
-                <option value="Kore">👩 AI 여성 (차분한 톤)</option>
+                <option value="Puck">👨 AI 남성 목소리</option>
+                <option value="Aoede">👩 AI 여성 목소리</option>
               </select>
             </div>
             <div className="flex items-center gap-2">

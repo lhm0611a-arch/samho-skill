@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   UserSearch,
   ChevronDown,
@@ -104,15 +104,10 @@ export default function Evaluation() {
     }, 3200);
   };
 
-  // Check if a candidate's evaluation is completed
-  const isCandidateCompleted = (c: any) => {
-    const isFit = (c.job || "").includes("취부");
-    const hasSkillScore = isFit
-      ? (c.s_score_weld || 0) > 0 && (c.s_score_fit || 0) > 0
-      : (c.s_score_weld || 0) > 0;
-    const isSkillDone = c.s_status === "완료" || hasSkillScore;
+  // Check if Korean evaluation is completed for a candidate
+  const isCandidateKoreanDone = useCallback((c: any) => {
+    if (!c) return false;
     const isKoreanDone = c.k_status === "완료" || (c.k_score || 0) > 0;
-
     if (userRole === "interviewer") {
       const myKoreanLog = globalLogs.find(
         (l) =>
@@ -122,9 +117,27 @@ export default function Evaluation() {
       );
       return !!myKoreanLog || isKoreanDone;
     }
+    return isKoreanDone;
+  }, [userRole, globalLogs, evaluatorName]);
 
-    return isKoreanDone && isSkillDone;
-  };
+  // Check if Skill evaluation is completed for a candidate
+  const isCandidateSkillDone = useCallback((c: any) => {
+    if (!c) return false;
+    const isFit = (c.job || "").includes("취부");
+    const hasSkillScore = isFit
+      ? (c.s_score_weld || 0) > 0 && (c.s_score_fit || 0) > 0
+      : (c.s_score_weld || 0) > 0;
+    return c.s_status === "완료" || hasSkillScore;
+  }, []);
+
+  // Check if ALL evaluations are completed (Both Korean and Skill must be completed)
+  const isCandidateCompleted = useCallback((c: any) => {
+    if (!c) return false;
+    if (userRole === "interviewer") {
+      return isCandidateKoreanDone(c);
+    }
+    return isCandidateKoreanDone(c) && isCandidateSkillDone(c);
+  }, [userRole, isCandidateKoreanDone, isCandidateSkillDone]);
 
   // Helper to convert 6-item scores or indexes into button indexes (0..4)
   function convertArrayToKVals(arr: any[], targetTotalScore?: number): number[] {
@@ -244,14 +257,11 @@ export default function Evaluation() {
     return kVals;
   }
 
-  // Automatically enable showCompleted & sync filter dropdowns when selected candidate changes
+  // Sync filter dropdowns when selected candidate changes (do not force showCompleted to true)
   useEffect(() => {
     if (selectedUid) {
       const c = candidates.find((item) => item.uid === selectedUid);
       if (c) {
-        if (isCandidateCompleted(c)) {
-          setShowCompleted(true);
-        }
         if (c.eval_type) setFilterType(c.eval_type);
         if (c.eval_date) setFilterDate(c.eval_date);
         if (c.country) setFilterCountry(c.country);
@@ -267,7 +277,7 @@ export default function Evaluation() {
       if (selectedUid && c.uid === selectedUid) return true;
       return !isCandidateCompleted(c);
     });
-  }, [candidates, showCompleted, selectedUid, globalLogs, userRole, evaluatorName]);
+  }, [candidates, showCompleted, selectedUid, isCandidateCompleted]);
 
   const validTypes = useMemo(
     () =>
@@ -670,9 +680,61 @@ export default function Evaluation() {
       localStorage.setItem("hd_candidates", JSON.stringify(updatedCandidates));
     } catch (e) {}
 
+    // Find next candidate for continuous sequential evaluation workflow
+    const filteredPool = updatedCandidates
+      .filter((c) => {
+        if (!showCompleted && isCandidateCompleted(c) && c.uid !== p.uid) return false;
+        if (filterType !== "all" && c.eval_type !== filterType) return false;
+        if (filterDate !== "all" && c.eval_date !== filterDate) return false;
+        if (filterCountry !== "all" && c.country !== filterCountry) return false;
+        if (filterAgency !== "all" && c.agency !== filterAgency) return false;
+        return true;
+      })
+      .sort((a, b) => String(a.app_no).localeCompare(String(b.app_no), "en", { numeric: true }));
+
+    const currentIndex = filteredPool.findIndex((c) => c.uid === p.uid);
+    let nextCandidate: any = null;
+
+    if (filteredPool.length > 0) {
+      // 1. Search forward from current index for next pending candidate in current evaluation mode
+      for (let step = 1; step <= filteredPool.length; step++) {
+        const checkIdx = (currentIndex + step) % filteredPool.length;
+        const candidateAtIdx = filteredPool[checkIdx];
+        if (candidateAtIdx.uid === p.uid) continue;
+
+        const isKorPending = !isCandidateKoreanDone(candidateAtIdx);
+        const isSklPending = !isCandidateSkillDone(candidateAtIdx);
+
+        if (currentTab === "korean" && isKorPending) {
+          nextCandidate = candidateAtIdx;
+          break;
+        } else if (currentTab === "skill" && isSklPending) {
+          nextCandidate = candidateAtIdx;
+          break;
+        }
+      }
+
+      // 2. If all ahead are evaluated, check if any other candidate exists
+      if (!nextCandidate && filteredPool.length > 1) {
+        for (let step = 1; step < filteredPool.length; step++) {
+          const checkIdx = (currentIndex + step) % filteredPool.length;
+          if (filteredPool[checkIdx].uid !== p.uid) {
+            nextCandidate = filteredPool[checkIdx];
+            break;
+          }
+        }
+      }
+    }
+
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
-    showToast(`[${p.name}] 평가 점수가 성공적으로 저장되었습니다!`, "success");
+
+    if (nextCandidate) {
+      setSelectedUid(nextCandidate.uid);
+      showToast(`[${p.name}] 점수 저장 완료 ➔ 다음 응시자 [${nextCandidate.app_no} ${nextCandidate.name}] 이동`, "success");
+    } else {
+      showToast(`[${p.name}] 평가 점수가 저장되었습니다! (해당 조건 응시자 평가 완료)`, "success");
+    }
 
     if (gasUrl && gasUrl.trim() !== "") {
       try {
@@ -1063,18 +1125,20 @@ export default function Evaluation() {
                 </option>
               )}
               {filteredCandidates.map((c, idx) => {
-                const isDone = isCandidateCompleted(c);
-                let label = `[${c.app_no}] ${c.name?.toUpperCase()} (${c.country || "미상"}/${c.agency || "미상"})`;
-                if (isDone) {
-                  label += " [완료]";
-                } else {
-                  if (c.k_status === "완료" || (c.k_score || 0) > 0) label += " [한완료]";
-                  const isFit = (c.job || "").includes("취부");
-                  const hasSkillScore = isFit
-                    ? (c.s_score_weld || 0) > 0 && (c.s_score_fit || 0) > 0
-                    : (c.s_score_weld || 0) > 0;
-                  if (c.s_status === "완료" || hasSkillScore) label += " [기완료]";
+                const isKorDone = isCandidateKoreanDone(c);
+                const isSklDone = isCandidateSkillDone(c);
+                const isFullyDone = isKorDone && isSklDone;
+                
+                let statusTag = "";
+                if (isFullyDone) {
+                  statusTag = " (전체완료)";
+                } else if (isKorDone && !isSklDone) {
+                  statusTag = " (한국어완료 / 기량대기)";
+                } else if (!isKorDone && isSklDone) {
+                  statusTag = " (한국어대기 / 기량완료)";
                 }
+
+                const label = `[${c.app_no}] ${c.name?.toUpperCase()}${statusTag}`;
                 return (
                   <option key={`${c.uid || c.app_no}_${idx}`} value={c.uid}>
                     {label}

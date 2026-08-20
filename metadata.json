@@ -1,0 +1,6 @@
+{
+  "name": "외국인 용접공 한국어 구술 면접 시스템",
+  "description": "조선소 및 현장 외국인 용접공을 위한 TOPIK 1급 수준의 한국어 구술 면접 및 역량 평가 시스템",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

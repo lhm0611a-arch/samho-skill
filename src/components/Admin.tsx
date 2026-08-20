@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Database, Upload, Download, RefreshCw, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code, Copy, FileDown } from 'lucide-react';
+import { Database, Upload, Download, RefreshCw, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code, Code2, Copy, FileDown, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as XLSX from 'xlsx';
 import { 
@@ -29,8 +29,8 @@ export default function Admin() {
   const [uploadType, setUploadType] = useState('사전기량검증');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgressMsg, setUploadProgressMsg] = useState("");
-  const [showGasModal, setShowGasModal] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [showGasCodeModal, setShowGasCodeModal] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerateQuestions = async () => {
@@ -406,6 +406,9 @@ export default function Admin() {
                     </div>
 
                     <div className="flex flex-col gap-3 pt-4 border-t border-[#1e3a5f]">
+                        <button onClick={() => setShowGasCodeModal(true)} className="bg-indigo-900/40 text-indigo-200 border border-indigo-500/40 hover:bg-indigo-700 hover:text-white w-full py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
+                            <Code2 className="w-4 h-4 text-indigo-400" /> GAS 최신 서버 코드 확인 및 복사
+                        </button>
                         <button onClick={handleClearAll} className="bg-red-900/20 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white w-full py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
                             <Trash2 className="w-4 h-4" /> 시스템 로컬 초기화
                         </button>
@@ -551,6 +554,313 @@ export default function Admin() {
                             >
                                 <CheckCircle className="w-5 h-5" />
                                 선택한 문항 적용하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showGasCodeModal && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
+                    <div className="bg-[#08172c] border border-[#1e3a5f] rounded-2xl p-6 w-full max-w-4xl shadow-2xl relative my-8 flex flex-col max-h-[85vh]">
+                        <div className="flex items-center justify-between pb-4 border-b border-[#1e3a5f]">
+                            <h3 className="text-xl font-black text-slate-100 flex items-center gap-3">
+                                <Code2 className="w-6 h-6 text-indigo-400" /> Google Apps Script (GAS) 최신 연동 코드
+                            </h3>
+                            <button
+                                onClick={() => setShowGasCodeModal(false)}
+                                className="text-slate-400 hover:text-white px-3 py-1 rounded-lg bg-slate-800 text-sm font-bold"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                        <div className="py-3 text-xs text-slate-300 bg-indigo-950/40 border border-indigo-500/30 rounded-xl px-4 my-3 space-y-1">
+                            <p className="font-bold text-indigo-200">💡 구글 시트 배포 방법:</p>
+                            <p>1. 구글 스프레드시트 메뉴에서 <strong>[확장 프로그램] → [Apps Script]</strong>를 엽니다.</p>
+                            <p>2. 아래 코드를 전체 복사하여 <code className="text-amber-300 font-mono">코드.gs</code>에 붙여넣고 저장합니다.</p>
+                            <p>3. 상단 <strong>[배포] → [새 배포]</strong> (또는 배포 관리에서 새 버전) 선택 후 유형을 <strong>웹 앱(Web App)</strong>으로 지정하고, 액세스 권한을 <strong>'모든 사용자(Anyone)'</strong>로 설정하여 배포합니다.</p>
+                            <p>4. 생성된 웹 앱 URL을 복사하여 위 <strong>[Google Apps Script URL 동기화]</strong> 입력창에 붙여넣고 저장합니다.</p>
+                        </div>
+                        <div className="relative flex-1 min-h-[300px] overflow-hidden rounded-xl border border-[#1e3a5f] bg-[#030f1c]">
+                            <button
+                                onClick={() => {
+                                    const codeEl = document.getElementById("gas-code-content");
+                                    if (codeEl) {
+                                        navigator.clipboard.writeText(codeEl.innerText);
+                                        setCopiedCode(true);
+                                        setTimeout(() => setCopiedCode(false), 2000);
+                                    }
+                                }}
+                                className="absolute top-3 right-3 z-10 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black px-4 py-2 rounded-lg shadow-lg flex items-center gap-1.5 transition-all"
+                            >
+                                {copiedCode ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                                {copiedCode ? "복사 완료!" : "전체 코드 복사"}
+                            </button>
+                            <pre id="gas-code-content" className="p-4 text-xs font-mono text-slate-200 overflow-y-auto h-[350px] custom-scrollbar select-all leading-relaxed whitespace-pre">
+{`function doGet(e) {
+  var lock = LockService.getScriptLock();
+  lock.tryLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var preSheet = ss.getSheetByName("사전기량검증");
+    var mainSheet = ss.getSheetByName("본기량검증");
+    var logSheet = ss.getSheetByName("로그");
+    
+    var applicants = [];
+    var logs = [];
+    
+    function parseSheet(sheet, typeName) {
+      if (!sheet) return;
+      var data = sheet.getDataRange().getValues();
+      if (data.length <= 1) return;
+      var headers = data[0];
+      
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        if (!row[1] && !row[3]) continue; // app_no 또는 name 없으면 스킵
+        
+        var no = row[0] || i;
+        var app_no = String(row[1] || '').trim();
+        var job = String(row[2] || '').trim();
+        var name = String(row[3] || '').trim();
+        var dob = row[4] ? String(row[4]).trim() : '';
+        var e9 = String(row[5] || 'X').trim();
+        var age = Number(row[6]) || 0;
+        
+        var q1 = Number(row[7]) || 0;
+        var q2 = Number(row[8]) || 0;
+        var q3 = Number(row[9]) || 0;
+        var q4 = Number(row[10]) || 0;
+        var q5 = Number(row[11]) || 0;
+        var q6 = Number(row[12]) || 0;
+        var k_score = Number(row[13]) || 0;
+        var k_grade = String(row[14] || '-').trim();
+        var k_pass = String(row[15] || '대기').trim();
+        var s_score_weld = Number(row[17]) || 0;
+        var grade_weld = String(row[18] || '-').trim();
+        var s_score_fit = Number(row[19]) || 0;
+        var grade_fit = String(row[20] || '-').trim();
+        var result = String(row[21] || '대기').trim();
+        var country = String(row[22] || '').trim();
+        var agency = String(row[23] || '').trim();
+        var eval_date = row[24] ? String(row[24]).trim() : '';
+        
+        applicants.push({
+          no: no,
+          app_no: app_no,
+          job: job,
+          name: name,
+          dob: dob,
+          e9: e9,
+          age: age,
+          eval_type: typeName,
+          k_score: k_score,
+          k_grade: k_grade,
+          k_pass: k_pass,
+          k_status: (k_score > 0 || k_pass === '합격' || k_pass === '불합격') ? '완료' : '대기',
+          k_vals: [q1, q2, q3, q4, q5, q6],
+          s_score_weld: s_score_weld,
+          grade_weld: grade_weld,
+          s_score_fit: s_score_fit,
+          grade_fit: grade_fit,
+          s_status: (s_score_weld > 0 || s_score_fit > 0) ? '완료' : '대기',
+          result: result,
+          country: country,
+          agency: agency,
+          eval_date: eval_date
+        });
+      }
+    }
+    
+    parseSheet(preSheet, "사전기량검증");
+    parseSheet(mainSheet, "본기량검증");
+    
+    if (logSheet) {
+      var logData = logSheet.getDataRange().getValues();
+      for (var j = 1; j < logData.length; j++) {
+        var lRow = logData[j];
+        if (!lRow[0] && !lRow[1]) continue;
+        logs.push({
+          eval_date: String(lRow[0] || ''),
+          eval_type: String(lRow[1] || ''),
+          evaluator: String(lRow[2] || ''),
+          app_no: String(lRow[3] || ''),
+          score: Number(lRow[4]) || 0,
+          details: String(lRow[5] || '[]'),
+          name: String(lRow[6] || '')
+        });
+      }
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      applicants: applicants,
+      logs: logs
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.tryLock(15000);
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    var evalType = data.eval_type || "사전기량검증";
+    var sheetName = evalType.indexOf("본") !== -1 ? "본기량검증" : "사전기량검증";
+    var targetSheet = ss.getSheetByName(sheetName);
+    var logSheet = ss.getSheetByName("로그");
+    
+    if (!targetSheet) {
+      targetSheet = ss.insertSheet(sheetName);
+      targetSheet.appendRow([
+        "연번", "수험번호", "직종", "성명", "생년월일", "E-9여부", "만나이",
+        "언어이해", "발음명확성", "문법구성", "어휘활용", "표현력", "질의응답",
+        "한국어총점", "한국어등급", "한국어판정", "면접관의견",
+        "기량용접점수", "기량용접등급", "기량취부점수", "기량취부등급", "최종결과",
+        "국가", "송출업체", "평가일자"
+      ]);
+    }
+    
+    var appNo = String(data.app_no || data.id || '').trim();
+    var name = String(data.name || '').trim();
+    var saveMode = String(data.save_mode || data.mode || data.type || '').toLowerCase();
+    var isReset = (data.type === 'reset' || data.action === 'reset');
+    
+    // 1. 점수 초기화 (RESET) 처리
+    if (isReset) {
+      if (targetSheet) {
+        var sData = targetSheet.getDataRange().getValues();
+        for (var r = 1; r < sData.length; r++) {
+          var rowAppNo = String(sData[r][1] || '').trim();
+          var rowName = String(sData[r][3] || '').trim();
+          if (rowAppNo === appNo || (name && rowName === name)) {
+            var rowIdx = r + 1;
+            if (saveMode === 'korean') {
+              // 한국어 관련 컬럼 초기화 (H열 ~ P열)
+              targetSheet.getRange(rowIdx, 8, 1, 9).setValues([[0, 0, 0, 0, 0, 0, 0, "-", "대기"]]);
+            } else {
+              // 기량 관련 컬럼 초기화 (R열 ~ U열) 및 의견(Q열)
+              targetSheet.getRange(rowIdx, 17, 1, 5).setValues([["", 0, "-", 0, "-"]]);
+            }
+            // 최종 판정(V열) 갱신
+            targetSheet.getRange(rowIdx, 22).setValue("대기");
+            break;
+          }
+        }
+      }
+      
+      // 로그 시트에서 해당 수험자의 로그 삭제
+      if (logSheet && saveMode === 'korean') {
+        var lData = logSheet.getDataRange().getValues();
+        for (var lr = lData.length - 1; lr >= 1; lr--) {
+          var logAppNo = String(lData[lr][3] || '').trim();
+          var logType = String(lData[lr][1] || '').trim();
+          if (logAppNo === appNo && (logType.indexOf(evalType) !== -1 || evalType.indexOf(logType) !== -1)) {
+            logSheet.deleteRow(lr + 1);
+          }
+        }
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Reset completed successfully"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 2. 점수 저장 (SAVE) 처리
+    if (targetSheet) {
+      var sData2 = targetSheet.getDataRange().getValues();
+      var foundRow = -1;
+      for (var r2 = 1; r2 < sData2.length; r2++) {
+        var rowAppNo2 = String(sData2[r2][1] || '').trim();
+        var rowName2 = String(sData2[r2][3] || '').trim();
+        if (rowAppNo2 === appNo || (name && rowName2 === name)) {
+          foundRow = r2 + 1;
+          break;
+        }
+      }
+      
+      var q1 = Number(data.q1 || 0);
+      var q2 = Number(data.q2 || 0);
+      var q3 = Number(data.q3 || 0);
+      var q4 = Number(data.q4 || 0);
+      var q5 = Number(data.q5 || 0);
+      var q6 = Number(data.q6 || 0);
+      var kScore = Number(data.k_score || 0);
+      var kGrade = String(data.k_grade || '-');
+      var kPass = String(data.k_pass || '대기');
+      var sWeld = Number(data.s_score_weld || 0);
+      var gWeld = String(data.grade_weld || '-');
+      var sFit = Number(data.s_score_fit || 0);
+      var gFit = String(data.grade_fit || '-');
+      var memo = String(data.memo || '');
+      var result = String(data.result || '대기');
+      var evalDate = String(data.eval_date || '');
+      var country = String(data.country || '');
+      var agency = String(data.agency || '');
+      
+      if (foundRow !== -1) {
+        if (saveMode === 'korean') {
+          targetSheet.getRange(foundRow, 8, 1, 9).setValues([[q1, q2, q3, q4, q5, q6, kScore, kGrade, kPass]]);
+        } else {
+          targetSheet.getRange(foundRow, 17, 1, 5).setValues([[memo, sWeld, gWeld, sFit, gFit]]);
+        }
+        targetSheet.getRange(foundRow, 22).setValue(result);
+        if (evalDate) targetSheet.getRange(foundRow, 25).setValue(evalDate);
+        if (country) targetSheet.getRange(foundRow, 23).setValue(country);
+        if (agency) targetSheet.getRange(foundRow, 24).setValue(agency);
+      }
+    }
+    
+    // 로그 시트에 면접관별 평가 기록 추가
+    if (logSheet && saveMode === 'korean') {
+      var evaluator = String(data.evaluator || data.evaluator_name || '평가위원').trim();
+      var details = JSON.stringify(data.details || [q1, q2, q3, q4, q5, q6]);
+      var myScore = Number(data.my_score || data.score || kScore);
+      
+      // 동일 면접관의 기존 평가 로그가 있으면 업데이트 또는 추가
+      logSheet.appendRow([
+        evalDate || new Date().toISOString().substring(0, 10),
+        evalType,
+        evaluator,
+        appNo,
+        myScore,
+        details,
+        name
+      ]);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "Save completed successfully"
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}`}
+                            </pre>
+                        </div>
+                        <div className="flex justify-end pt-4 border-t border-[#1e3a5f] mt-4">
+                            <button
+                                onClick={() => setShowGasCodeModal(false)}
+                                className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-6 py-2.5 rounded-xl transition-all"
+                            >
+                                닫기
                             </button>
                         </div>
                     </div>

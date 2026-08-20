@@ -1,8 +1,22 @@
 import React, { useState, useRef } from 'react';
-import { Database, Upload, Download, RefreshCw, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code, Copy } from 'lucide-react';
+import { Database, Upload, Download, RefreshCw, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code, Copy, FileDown } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as XLSX from 'xlsx';
-import { getKoreanGrade, getKoreanPassText, checkKoreanPass, getSkillGradeByScore } from '../lib/utils';
+import { 
+  getKoreanGrade, 
+  getKoreanPassText, 
+  checkKoreanPass, 
+  getSkillGradeByScore, 
+  determineResult,
+  normalizeAppNo, 
+  normalizeName, 
+  normalizeJob, 
+  normalizeDob, 
+  calculateAge, 
+  normalizeE9, 
+  normalizeType, 
+  formatYYYYMMDD 
+} from '../lib/utils';
 
 export default function Admin() {
   const { candidates, setCandidates, globalLogs, setGlobalLogs, gasUrl, setGasUrl, fetchData, confCountry, setConfCountry, confAgency, setConfAgency } = useAppContext();
@@ -43,21 +57,37 @@ export default function Admin() {
     }
   };
 
-  const normalizeType = (t: string) => {
-      if (!t) return '사전기량검증';
-      const str = String(t).replace(/\s/g, ''); 
-      if (str.includes('본')) return '본기량검증';
-      return '사전기량검증';
-  };
-
-  const formatYYYYMMDD = (str: any) => {
-      if (!str) return '';
-      const s = String(str).trim();
-      const match = s.match(/(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/);
-      if (match) {
-          return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        'NO': 1,
+        '응시번호': 'TM-001',
+        '직종': '선각취부',
+        '성명': 'PHAN HUU CUONG',
+        '생년월일': '1986-10-18',
+        'E-9': 'O'
+      },
+      {
+        'NO': 2,
+        '응시번호': 'C-001',
+        '직종': '용접',
+        '성명': 'LE VAN NAM',
+        '생년월일': '1988-01-02',
+        'E-9': 'O'
+      },
+      {
+        'NO': 3,
+        '응시번호': 'D-001',
+        '직종': '의장취부',
+        '성명': 'NGUYEN VAN DUNG',
+        '생년월일': '1991-06-26',
+        'E-9': 'X'
       }
-      return s.split(/[ T]/)[0].replace(/\./g, '-'); 
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '평가명단');
+    XLSX.writeFile(wb, 'HD현대삼호_평가명단_표준양식.xlsx');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,49 +124,41 @@ export default function Admin() {
           return json.slice(startIndex).map((r, index) => {
             try {
               if (!r || r.length < 2) return null;
-              let appNoRaw = r[1] !== undefined ? String(r[1]).trim() : '';
-              if (appNoRaw === '') return null;
-              
-              appNoRaw = appNoRaw.toUpperCase().replace(/[\s-]/g, '').replace(/([A-Z]+)(\d+)/, '$1-$2');
-              
-              let e9Str = (r[5] || 'X').toString().toUpperCase().trim();
-              let e9 = (['O', '0', 'YES', '○'].some(k => e9Str.includes(k))) ? 'O' : 'X';
-              
-              let eval_date = r[24];
-              if (!eval_date) {
-                eval_date = '';
-              } else if (typeof eval_date === 'number') {
-                let d = new Date(Math.round((eval_date - 25569) * 86400 * 1000));
-                eval_date = d.toISOString().split('T')[0];
-              } else {
-                eval_date = String(eval_date);
-              }
-              eval_date = formatYYYYMMDD(eval_date);
 
-              let dobStr = r[4];
-              let dob = '';
-              let age = parseInt(r[6]);
-              
-              if (typeof dobStr === 'number') {
-                let d = new Date(Math.round((dobStr - 25569) * 86400 * 1000));
-                dob = d.toISOString().split('T')[0];
-                if (isNaN(age)) age = new Date().getFullYear() - d.getFullYear();
-              } else if (typeof dobStr === 'string' && dobStr.trim() !== '') {
-                dob = dobStr.replace(/\./g, '-').replace(/\s/g, '');
-                if (isNaN(age)) {
-                  let d = new Date(dob);
-                  if (!isNaN(d.getTime())) age = new Date().getFullYear() - d.getFullYear();
-                }
-              } else if (dobStr) {
-                dob = String(dobStr);
-              }
-              age = isNaN(age) ? 0 : age;
+              // A열: NO (r[0])
+              const rowNo = parseInt(r[0]) || index + 1;
 
+              // B열: 응시번호 (r[1]) -> 예: TM01 -> TM-001, C1 -> C-001, D-04 -> D-004
+              const appNoRaw = normalizeAppNo(r[1]);
+              if (!appNoRaw) return null;
+
+              // C열: 직종 (r[2]) -> 용접, 선각취부, 의장취부 등
+              const job = normalizeJob(r[2]);
+
+              // D열: 성명 (r[3]) -> 대문자 및 공백 정리
+              const candidateName = normalizeName(r[3]);
+
+              // E열: 생년월일 (r[4]) -> 19820611, 820611, 82.06.11 등 어떠한 포맷도 1982-06-11로 정규화
+              const dob = normalizeDob(r[4]);
+
+              // F열: E-9 출신 여부 (r[5]) -> O 또는 X
+              const e9 = normalizeE9(r[5]);
+
+              // 나이: 생년월일 기준 만 나이 자동 정확 계산
+              let age = calculateAge(dob);
+              if (age === 0 && r[6]) {
+                const parsedAge = parseInt(r[6]);
+                if (!isNaN(parsedAge) && parsedAge > 0) age = parsedAge;
+              }
+
+              // 평가일자 (r[24] 또는 오늘 날짜)
+              let eval_date = r[24] ? normalizeDob(r[24]) : '';
+
+              // 기량/한국어 점수 (종합 시트인 경우)
               let k_score = parseInt(r[13]) || 0;
               let s_fit = parseInt(r[17]) || 0;
               let s_weld = parseInt(r[19]) || 0;
 
-              const candidateName = r[3] !== undefined && String(r[3]).trim() !== '' ? String(r[3]).toUpperCase().trim() : '이름없음';
               const evalType = normalizeType(typeName);
 
               const baseUid = appNoRaw + '_' + candidateName + '_' + eval_date + '_' + evalType;
@@ -144,12 +166,12 @@ export default function Admin() {
               seenUploadUids.set(baseUid, count + 1);
               const uniqueUid = count === 0 ? baseUid : `${baseUid}_${count}`;
 
-              return {
+              const tempCandidate = {
                 id: appNoRaw,
                 uid: uniqueUid,
-                no: r[0] || index + 1,
+                no: rowNo,
                 app_no: appNoRaw,
-                job: r[2] !== undefined ? String(r[2]).trim() : '',
+                job: job,
                 name: candidateName,
                 dob: dob,
                 age: age,
@@ -169,6 +191,13 @@ export default function Admin() {
                 s_status: (s_fit > 0 || s_weld > 0) ? '완료' : '대기',
                 result: r[21] || '대기'
               };
+
+              // 자동 종합 결과 계산
+              if (k_score > 0 || s_fit > 0 || s_weld > 0) {
+                tempCandidate.result = determineResult(tempCandidate);
+              }
+
+              return tempCandidate;
             } catch (rowErr) {
               console.error('Row parse error', rowErr, r);
               return null;
@@ -409,8 +438,11 @@ export default function Admin() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <button onClick={saveUploadConfig} className="bg-slate-800 text-slate-200 border border-slate-500 px-6 py-3 rounded-sm text-sm font-black hover:bg-slate-700 hover:text-white hover:border-slate-400 transition-colors flex-1 flex items-center justify-center gap-2 tracking-wide shadow-md">
+                        <button onClick={saveUploadConfig} className="bg-slate-800 text-slate-200 border border-slate-500 px-4 py-3 rounded-sm text-sm font-black hover:bg-slate-700 hover:text-white hover:border-slate-400 transition-colors flex-1 flex items-center justify-center gap-2 tracking-wide shadow-md">
                             <Settings className="w-5 h-5" /> 업로드 환경 저장
+                        </button>
+                        <button onClick={handleDownloadTemplate} className="bg-blue-900/60 text-blue-200 border border-blue-500/50 hover:bg-blue-800 hover:text-white px-4 py-3 rounded-sm text-sm font-black transition-colors flex-1 flex items-center justify-center gap-2 tracking-wide shadow-md">
+                            <FileDown className="w-5 h-5 text-blue-400" /> 표준 서식 다운로드
                         </button>
                         <input 
                             type="file" 
@@ -437,10 +469,14 @@ export default function Admin() {
                     </div>
 
                     <div className="mt-5 p-4 bg-slate-800/80 rounded-sm border border-[#1e3a5f] text-xs text-slate-300 font-bold leading-relaxed shadow-inner">
-                        <p className="font-black text-purple-300 mb-1.5 text-sm flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-purple-400" /> 데이터 구조 가이드라인</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                            <li>파일 내 <strong className="text-white bg-slate-900 px-1 rounded border border-slate-600">'사전기량검증'</strong>, <strong className="text-white bg-slate-900 px-1 rounded border border-slate-600">'본기량검증'</strong>, <strong className="text-white bg-slate-900 px-1 rounded border border-slate-600">'log'</strong> 시트가 존재하면 시스템이 자동으로 3개 시트를 동시 파싱합니다.</li>
-                            <li><strong className="text-blue-300">A열(NO), B열(응시번호), C열(직종), D열(성명), E열(생년월일), F열(E-9)</strong> 순서를 반드시 준수해야 합니다.</li>
+                        <p className="font-black text-purple-300 mb-2 text-sm flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-purple-400" /> 스마트 엑셀 자동 보정 및 데이터 가이드라인</p>
+                        <ul className="list-disc pl-5 space-y-1.5">
+                            <li><strong className="text-blue-300">표준 열 구성 (A~F열)</strong>: <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">A: NO</span>, <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">B: 응시번호</span>, <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">C: 직종</span>, <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">D: 성명</span>, <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">E: 생년월일</span>, <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">F: E-9 여부</span></li>
+                            <li><strong className="text-emerald-400">응시번호 3자리 자동 패딩</strong>: <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">TM01</code>, <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">TM-1</code> → <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">TM-001</code> / <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">C1</code> → <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">C-001</code> / <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">D-04</code> → <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">D-004</code> 자동 변환</li>
+                            <li><strong className="text-emerald-400">성명 대문자 자동 변환</strong>: 소문자로 입력해도 시스템/서버에 영문 대문자(<code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">PHAN HUU CUONG</code>)로 자동 등록</li>
+                            <li><strong className="text-emerald-400">생년월일 및 만 나이 자동 계산</strong>: <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">19820611</code>, <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">820611</code>, <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">82.06.11</code>, <code className="text-amber-300 font-mono bg-black/40 px-1 rounded">82-06-11</code> 등 어떤 형식이든 <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">1982-06-11</code>로 변환되고 <strong>만 나이가 자동 산출</strong>됩니다.</li>
+                            <li><strong className="text-emerald-400">직종 표준화</strong>: <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">용접</code>, <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">선각취부</code>, <code className="text-emerald-300 font-mono bg-black/40 px-1 rounded">의장취부</code>로 정규화 매칭</li>
+                            <li>파일 내 <strong className="text-white bg-slate-900 px-1 rounded border border-slate-600">'사전기량검증'</strong>, <strong className="text-white bg-slate-900 px-1 rounded border border-slate-600">'본기량검증'</strong>, <strong className="text-white bg-slate-900 px-1 rounded border border-slate-600">'log'</strong> 시트가 있으면 다중 시트 동시 파싱 지원</li>
                         </ul>
                     </div>
                 </div>

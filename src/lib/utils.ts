@@ -80,13 +80,20 @@ export function normalizeDob(raw: any): string {
   if (raw === undefined || raw === null) return '';
 
   const currentYear = new Date().getFullYear();
+  const minAge = 15;
+  const maxBirthYear = currentYear - minAge; // 만 15세 이상 (예: 2026년 기준 2011년 이전 출생)
 
   // 1. 숫자형 또는 5자리 숫자 (엑셀 시리얼 날짜: 15000~50000 -> 1941년~2036년)
   const numVal = typeof raw === 'number' ? raw : (typeof raw === 'string' && /^\d{5}$/.test(raw.trim()) ? Number(raw.trim()) : null);
   if (numVal !== null && numVal >= 15000 && numVal <= 50000) {
     const date = new Date(Math.round((numVal - 25569) * 86400 * 1000));
     if (!isNaN(date.getTime())) {
-      const y = date.getUTCFullYear();
+      let y = date.getUTCFullYear();
+      // 만약 엑셀 시리얼 날짜가 15세 미만 연도(예: 2018, 2024)로 계산된 경우 1900년대 연도(1918, 1986 등) 보정 검토
+      if (y > maxBirthYear && y <= currentYear) {
+        const altY = 1900 + (y % 100);
+        if (altY >= 1940 && altY <= maxBirthYear) y = altY;
+      }
       if (y >= 1940 && y <= currentYear) {
         const m = String(date.getUTCMonth() + 1).padStart(2, '0');
         const d = String(date.getUTCDate()).padStart(2, '0');
@@ -101,9 +108,19 @@ export function normalizeDob(raw: any): string {
   // 2. 구분자 있는 4자리 연도 시작: YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD
   const matchYMD = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
   if (matchYMD) {
-    const y = parseInt(matchYMD[1], 10);
+    let y = parseInt(matchYMD[1], 10);
     const m = parseInt(matchYMD[2], 10);
     const d = parseInt(matchYMD[3], 10);
+
+    // 만 15세 이상 기준: 만약 연도가 15세 미만(예: 2018, 2022)으로 들어온 경우
+    if (y > maxBirthYear && y <= currentYear) {
+      // 1) 1900년대 연도(19XX)로 보정 시도 (예: 2086 -> 1986, 2018 -> 1918)
+      const altY = 1900 + (y % 100);
+      if (altY >= 1940 && altY <= maxBirthYear) {
+        y = altY;
+      }
+    }
+
     if (y >= 1940 && y <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
@@ -114,7 +131,15 @@ export function normalizeDob(raw: any): string {
   if (matchDMY) {
     const d = parseInt(matchDMY[1], 10);
     const m = parseInt(matchDMY[2], 10);
-    const y = parseInt(matchDMY[3], 10);
+    let y = parseInt(matchDMY[3], 10);
+
+    if (y > maxBirthYear && y <= currentYear) {
+      const altY = 1900 + (y % 100);
+      if (altY >= 1940 && altY <= maxBirthYear) {
+        y = altY;
+      }
+    }
+
     if (y >= 1940 && y <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
@@ -122,24 +147,44 @@ export function normalizeDob(raw: any): string {
 
   // 4. 8자리 연속 숫자 (YYYYMMDD) 예: 19861018
   if (/^\d{8}$/.test(s)) {
-    const y = parseInt(s.substring(0, 4), 10);
+    let y = parseInt(s.substring(0, 4), 10);
     const m = parseInt(s.substring(4, 6), 10);
     const d = parseInt(s.substring(6, 8), 10);
+
+    if (y > maxBirthYear && y <= currentYear) {
+      const altY = 1900 + (y % 100);
+      if (altY >= 1940 && altY <= maxBirthYear) y = altY;
+    }
+
     if (y >= 1940 && y <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
   }
 
   // 5. 구분자 있는 2자리 연도 시작 (YY-MM-DD, YY.MM.DD)
+  // 만 15세 이상 기준: 2000 + yy가 15세 미만(yy >= 12)인 경우 무조건 1900 + yy로 매핑
   const matchYYMD = s.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})$/);
   if (matchYYMD) {
-    const yy = parseInt(matchYYMD[1], 10);
-    const m = parseInt(matchYYMD[2], 10);
-    const d = parseInt(matchYYMD[3], 10);
-    // 근로자 연령(만 18세 이상) 기준: 00~10 -> 2000년대(2000~2010), 11~99 -> 1900년대(1911~1999)
-    const fullYear = yy <= 10 ? 2000 + yy : 1900 + yy;
-    if (fullYear >= 1940 && fullYear <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      return `${fullYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const num1 = parseInt(matchYYMD[1], 10);
+    const num2 = parseInt(matchYYMD[2], 10);
+    const num3 = parseInt(matchYYMD[3], 10);
+
+    // Case A: num1이 일(Day)이고 num3이 2자리 연도(YY)인 경우 (예: 31-10-86 -> 1986-10-31, 15-05-95)
+    if (num1 > 12 && num3 <= 99) {
+      const yy = num3;
+      const fullYear = (2000 + yy <= maxBirthYear) ? 2000 + yy : 1900 + yy;
+      const m = num2;
+      const d = num1;
+      if (fullYear >= 1940 && fullYear <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        return `${fullYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+
+    // Case B: num1이 2자리 연도(YY)이고 num3이 일(Day)인 경우 (예: 82-06-11 -> 1982-06-11, 04-03-15 -> 2004-03-15)
+    const yy = num1;
+    const fullYear = (2000 + yy <= maxBirthYear) ? 2000 + yy : 1900 + yy;
+    if (fullYear >= 1940 && fullYear <= currentYear && num2 >= 1 && num2 <= 12 && num3 >= 1 && num3 <= 31) {
+      return `${fullYear}-${String(num2).padStart(2, '0')}-${String(num3).padStart(2, '0')}`;
     }
   }
 
@@ -149,7 +194,7 @@ export function normalizeDob(raw: any): string {
     const d = parseInt(matchDMYY[1], 10);
     const m = parseInt(matchDMYY[2], 10);
     const yy = parseInt(matchDMYY[3], 10);
-    const fullYear = yy <= 10 ? 2000 + yy : 1900 + yy;
+    const fullYear = (2000 + yy <= maxBirthYear) ? 2000 + yy : 1900 + yy;
     if (fullYear >= 1940 && fullYear <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${fullYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
@@ -160,7 +205,7 @@ export function normalizeDob(raw: any): string {
     const yy = parseInt(s.substring(0, 2), 10);
     const m = parseInt(s.substring(2, 4), 10);
     const d = parseInt(s.substring(4, 6), 10);
-    const fullYear = yy <= 10 ? 2000 + yy : 1900 + yy;
+    const fullYear = (2000 + yy <= maxBirthYear) ? 2000 + yy : 1900 + yy;
     if (fullYear >= 1940 && fullYear <= currentYear && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${fullYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
@@ -168,7 +213,11 @@ export function normalizeDob(raw: any): string {
 
   // 8. 4자리 출생연도만 입력된 경우 (예: 1986)
   if (/^\d{4}$/.test(s)) {
-    const y = parseInt(s, 10);
+    let y = parseInt(s, 10);
+    if (y > maxBirthYear && y <= currentYear) {
+      const altY = 1900 + (y % 100);
+      if (altY >= 1940 && altY <= maxBirthYear) y = altY;
+    }
     if (y >= 1940 && y <= currentYear) {
       return `${y}-01-01`;
     }
@@ -177,7 +226,11 @@ export function normalizeDob(raw: any): string {
   // 9. 일반 표준 날짜 파싱
   const parsed = new Date(s);
   if (!isNaN(parsed.getTime())) {
-    const y = parsed.getFullYear();
+    let y = parsed.getFullYear();
+    if (y > maxBirthYear && y <= currentYear) {
+      const altY = 1900 + (y % 100);
+      if (altY >= 1940 && altY <= maxBirthYear) y = altY;
+    }
     if (y >= 1940 && y <= currentYear) {
       const m = String(parsed.getMonth() + 1).padStart(2, '0');
       const d = String(parsed.getDate()).padStart(2, '0');
@@ -189,7 +242,7 @@ export function normalizeDob(raw: any): string {
 }
 
 /**
- * 생년월일(YYYY-MM-DD) 기반 만 나이(International Age) 정확 계산
+ * 생년월일(YYYY-MM-DD) 기반 만 나이(International Age) 정확 계산 (만 15세 이상 기준)
  */
 export function calculateAge(dobStr: string, refDate: Date = new Date()): number {
   if (!dobStr) return 0;
@@ -197,7 +250,7 @@ export function calculateAge(dobStr: string, refDate: Date = new Date()): number
   if (!normalized) return 0;
   const parts = normalized.split('-');
   if (parts.length < 3) return 0;
-  const birthYear = parseInt(parts[0], 10);
+  let birthYear = parseInt(parts[0], 10);
   const birthMonth = parseInt(parts[1], 10);
   const birthDay = parseInt(parts[2], 10);
   if (isNaN(birthYear) || isNaN(birthMonth) || isNaN(birthDay)) return 0;
@@ -210,7 +263,20 @@ export function calculateAge(dobStr: string, refDate: Date = new Date()): number
   if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
     age--;
   }
-  return (age >= 10 && age <= 85) ? age : 0;
+
+  // 만 15세 이상 기준 보정: 계산된 나이가 15세 미만인 경우 1900년대 연도로 역산 검토
+  if (age < 15 && birthYear > currentYear - 15) {
+    const altYear = 1900 + (birthYear % 100);
+    let altAge = currentYear - altYear;
+    if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
+      altAge--;
+    }
+    if (altAge >= 15 && altAge <= 85) {
+      return altAge;
+    }
+  }
+
+  return age >= 0 ? age : 0;
 }
 
 /**

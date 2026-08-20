@@ -39,6 +39,8 @@ import {
   getBadgeHtml,
   normalizeType,
   formatYYYYMMDD,
+  calculateAge,
+  normalizeDob,
 } from "../lib/utils";
 import { playTTS, stopTTS, getTTSVoice, setTTSVoice } from "../lib/speech";
 
@@ -966,13 +968,14 @@ export default function Evaluation() {
           <span className="text-sm font-bold tracking-tight">{toast.message}</span>
         </div>
       )}
-      <div className="bg-[#051326] border-b border-[#1e3a5f] px-3 md:px-5 py-2 md:py-3 flex flex-col xl:flex-row gap-3 md:gap-4 xl:items-center shrink-0 z-30 relative shadow-sm">
-        <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 w-full xl:w-auto shrink-0">
-          <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 w-full lg:w-auto shrink-0 items-center">
+      <div className="bg-[#051326] border-b border-[#1e3a5f] px-3 md:px-5 py-2.5 flex flex-col gap-2.5 shrink-0 z-30 relative shadow-sm">
+        {/* Row 1: Filter Bar & Candidate Selector */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 w-full">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="dx-input !py-1.5 md:!py-2 !text-xs md:!text-sm cursor-pointer w-full md:w-32 bg-[#08172c]"
+              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
                 검증 {validTypes.length > 0 ? `(${validTypes.length})` : "전체"}
@@ -990,7 +993,7 @@ export default function Evaluation() {
             <select
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
-              className="dx-input !py-1.5 md:!py-2 !text-xs md:!text-sm cursor-pointer w-full md:w-32 bg-[#08172c]"
+              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[110px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
                 날짜 {validDates.length > 0 ? `(${validDates.length})` : "전체"}
@@ -1004,7 +1007,7 @@ export default function Evaluation() {
             <select
               value={filterCountry}
               onChange={(e) => setFilterCountry(e.target.value)}
-              className="dx-input !py-1.5 md:!py-2 !text-xs md:!text-sm cursor-pointer w-full md:w-32 bg-[#08172c]"
+              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
                 국가 {validCountries.length > 0 ? `(${validCountries.length})` : "전체"}
@@ -1018,7 +1021,7 @@ export default function Evaluation() {
             <select
               value={filterAgency}
               onChange={(e) => setFilterAgency(e.target.value)}
-              className="dx-input !py-1.5 md:!py-2 !text-xs md:!text-sm cursor-pointer w-full md:w-32 bg-[#08172c]"
+              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
                 업체 {validAgencies.length > 0 ? `(${validAgencies.length})` : "전체"}
@@ -1030,7 +1033,7 @@ export default function Evaluation() {
               ))}
             </select>
 
-            <label className="flex items-center gap-1.5 text-xs text-slate-300 font-bold cursor-pointer bg-[#08172c] px-2.5 py-1.5 rounded-lg border border-[#1e3a5f] hover:border-blue-500/50 transition-all select-none shrink-0 h-[34px]">
+            <label className="flex items-center gap-1.5 text-xs text-slate-300 font-bold cursor-pointer bg-[#08172c] px-2.5 py-1.5 rounded-lg border border-[#1e3a5f] hover:border-blue-500/50 transition-all select-none shrink-0 h-[32px]">
               <input
                 type="checkbox"
                 checked={showCompleted}
@@ -1041,17 +1044,16 @@ export default function Evaluation() {
             </label>
           </div>
 
-          <div className="w-px h-6 bg-slate-700 hidden lg:block self-center mx-1"></div>
-
-          <div className="relative w-full lg:w-72 shrink-0">
+          {/* Candidate Select Dropdown */}
+          <div className="relative w-full lg:w-96 shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <UserSearch className="text-blue-400 w-4 h-4 md:w-5 md:h-5" />
+              <UserSearch className="text-blue-400 w-4 h-4" />
             </div>
             <select
               value={selectedUid || ""}
               onChange={(e) => setSelectedUid(e.target.value)}
               disabled={filteredCandidates.length === 0}
-              className="dx-input w-full pl-9 md:pl-10 pr-8 !py-1.5 md:!py-2.5 font-black text-xs md:text-sm text-blue-300 cursor-pointer appearance-none bg-[#08172c] border-[#3b82f6]/50 focus:border-blue-400"
+              className="dx-input w-full pl-9 pr-8 !py-1.5 font-black text-xs md:text-sm text-blue-200 cursor-pointer appearance-none bg-[#08172c] border-[#3b82f6]/60 focus:border-blue-400 shadow-sm"
             >
               {filteredCandidates.length === 0 && (
                 <option value="">
@@ -1086,61 +1088,110 @@ export default function Evaluation() {
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-between xl:justify-start gap-1 sm:gap-2 md:gap-3 xl:gap-4 overflow-hidden whitespace-nowrap bg-[#08172c] border border-[#1e3a5f] rounded-xl px-2 sm:px-3 md:px-4 lg:px-5 py-2 text-[10px] sm:text-xs md:text-sm shadow-inner w-full">
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-slate-400 font-bold hidden sm:inline">이름</span>
-            <span className="font-black text-slate-100 text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[60px] sm:max-w-none">
-              {currentCandidate?.name?.toUpperCase() || "-"}
-            </span>
+        {/* Row 2: Selected Candidate Full Profile Information Banner (No text truncation, fully responsive) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3 bg-[#08172c] border border-[#1e3a5f] rounded-xl px-3 sm:px-4 py-2 text-xs shadow-inner">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
+            {/* 수험번호 & 성명 */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-blue-400 font-black bg-blue-950/70 border border-blue-800 px-1.5 py-0.5 rounded text-[11px] font-mono">
+                {currentCandidate?.app_no || "-"}
+              </span>
+              <span className="font-black text-white text-xs sm:text-sm tracking-wide">
+                {currentCandidate?.name?.toUpperCase() || "선택된 응시자 없음"}
+              </span>
+            </div>
+
+            <div className="hidden sm:block w-px h-3.5 bg-slate-700 shrink-0"></div>
+
+            {/* 나이 및 출생연도 */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-slate-400 font-bold">연령:</span>
+              <span className="font-bold text-emerald-400 text-xs sm:text-sm">
+                {(() => {
+                  if (!currentCandidate) return "-";
+                  let ageVal = Number(currentCandidate.age) || 0;
+                  const dobStr = currentCandidate.dob ? String(currentCandidate.dob).trim() : "";
+                  if (ageVal === 0 && dobStr) {
+                    ageVal = calculateAge(dobStr);
+                  }
+                  let birthYear = "";
+                  if (dobStr.includes("-")) {
+                    const y = dobStr.split("-")[0];
+                    if (/^\d{4}$/.test(y)) birthYear = y;
+                  } else if (/^\d{4}$/.test(dobStr)) {
+                    birthYear = dobStr;
+                  }
+                  if (!birthYear && ageVal >= 10 && ageVal <= 85) {
+                    birthYear = String(new Date().getFullYear() - ageVal);
+                  }
+                  if (ageVal === 0 && birthYear) {
+                    const y = parseInt(birthYear, 10);
+                    if (y >= 1940 && y <= new Date().getFullYear()) {
+                      ageVal = new Date().getFullYear() - y;
+                    }
+                  }
+
+                  if (ageVal > 0 && birthYear) {
+                    return `${ageVal}세 (${birthYear}년생)`;
+                  } else if (ageVal > 0) {
+                    return `${ageVal}세`;
+                  } else if (birthYear) {
+                    return `${birthYear}년생`;
+                  }
+                  return "-";
+                })()}
+              </span>
+            </div>
+
+            <div className="hidden sm:block w-px h-3.5 bg-slate-700 shrink-0"></div>
+
+            {/* E-9 여부 */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-slate-400 font-bold">E-9:</span>
+              <span
+                className={`font-black px-1.5 py-0.5 rounded text-[11px] ${
+                  currentCandidate?.e9 === "O"
+                    ? "bg-emerald-950 text-emerald-300 border border-emerald-700"
+                    : "bg-slate-800 text-slate-300 border border-slate-700"
+                }`}
+              >
+                {currentCandidate?.e9 === "O" ? "O (유경험)" : "X (신규)"}
+              </span>
+            </div>
+
+            <div className="hidden sm:block w-px h-3.5 bg-slate-700 shrink-0"></div>
+
+            {/* 직종 */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-slate-400 font-bold">직종:</span>
+              <span className="font-black text-amber-300 bg-amber-950/50 border border-amber-800 px-2 py-0.5 rounded text-xs">
+                {currentCandidate?.job || "-"}
+              </span>
+            </div>
+
+            <div className="hidden sm:block w-px h-3.5 bg-slate-700 shrink-0"></div>
+
+            {/* 국가 / 송출업체 */}
+            {(currentCandidate?.country || currentCandidate?.agency) && (
+              <div className="flex items-center gap-1.5 shrink-0 text-slate-300 text-xs">
+                <span className="text-slate-400 font-bold">소속:</span>
+                <span className="font-bold text-slate-200">
+                  {[currentCandidate.country, currentCandidate.agency].filter(Boolean).join(" / ")}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-slate-400 font-bold hidden sm:inline">나이</span>
-            <span className="font-bold text-blue-400 text-[11px] sm:text-xs md:text-sm lg:text-base">
-              {(() => {
-                if (!currentCandidate) return "-";
-                const ageVal = Number(currentCandidate.age) || 0;
-                const dobStr = currentCandidate.dob || "";
-                let birthYear = "";
-                if (dobStr.includes("-")) {
-                  const y = dobStr.split("-")[0];
-                  if (/^\d{4}$/.test(y)) birthYear = y;
-                } else if (/^\d{4}$/.test(dobStr)) {
-                  birthYear = dobStr;
-                }
-                if (ageVal > 0 && birthYear) {
-                  return `${ageVal}세 (${birthYear}년생)`;
-                } else if (ageVal > 0) {
-                  return `${ageVal}세`;
-                } else if (birthYear) {
-                  return `${birthYear}년생`;
-                }
-                return "-";
-              })()}
-            </span>
+
+          {/* 검증 구분 배지 */}
+          <div className="flex items-center gap-2 shrink-0">
+            {currentCandidate && (
+              <span
+                dangerouslySetInnerHTML={{
+                  __html: getBadgeHtml(currentCandidate.eval_type),
+                }}
+              ></span>
+            )}
           </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-slate-400 font-bold hidden sm:inline">E-9</span>
-            <span className="font-bold text-blue-400 text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[40px] sm:max-w-none">
-              {currentCandidate?.e9 || "-"}
-            </span>
-          </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-slate-400 font-bold hidden sm:inline">직종</span>
-            <span className="font-black text-hd-green text-[11px] sm:text-xs md:text-sm lg:text-base truncate max-w-[50px] sm:max-w-none">
-              {currentCandidate?.job || "-"}
-            </span>
-          </div>
-          <div className="w-px h-3 md:h-4 bg-slate-700 shrink-0"></div>
-          <span className="scale-75 sm:scale-90 lg:scale-100 origin-left shrink-0"
-            dangerouslySetInnerHTML={{
-              __html: currentCandidate
-                ? getBadgeHtml(currentCandidate.eval_type)
-                : "-",
-            }}
-          ></span>
         </div>
       </div>
 

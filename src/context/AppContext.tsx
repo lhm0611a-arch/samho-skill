@@ -47,7 +47,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [globalLogs, setGlobalLogs] = useState<Log[]>([]);
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [evaluatorName, setEvaluatorName] = useState('');
-  const [gasUrl, setGasUrlState] = useState<string>('https://script.google.com/macros/s/AKfycbyGi7nLuyFz_DIuEYdBu_4bWWa0VWU93zVnsUQi9SDLi9r7lU0c1a_j6gNigPoyhuf5/exec');
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyGi7nLuyFz_DIuEYdBu_4bWWa0VWU93zVnsUQi9SDLi9r7lU0c1a_j6gNigPoyhuf5/exec';
+  const [gasUrl, setGasUrlState] = useState<string>(DEFAULT_GAS_URL);
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [selectedCandidateUid, setSelectedCandidateUid] = useState<string | null>(null);
   const [confCountry, setConfCountryState] = useState('');
@@ -55,8 +56,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const savedUrl = localStorage.getItem('gasUrl');
-    if (savedUrl) setGasUrlState(savedUrl);
+    const savedUrl = localStorage.getItem('gasUrl') || localStorage.getItem('hd_gas_url');
+    if (savedUrl) {
+      setGasUrlState(savedUrl);
+    } else {
+      setGasUrlState(DEFAULT_GAS_URL);
+      localStorage.setItem('gasUrl', DEFAULT_GAS_URL);
+      localStorage.setItem('hd_gas_url', DEFAULT_GAS_URL);
+    }
     const savedCountry = localStorage.getItem('confCountry');
     if (savedCountry) setConfCountryState(savedCountry);
     const savedAgency = localStorage.getItem('confAgency');
@@ -103,6 +110,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const setGasUrl = (url: string) => {
     setGasUrlState(url);
     localStorage.setItem('gasUrl', url);
+    localStorage.setItem('hd_gas_url', url);
   };
 
   const setConfCountry = (country: string) => {

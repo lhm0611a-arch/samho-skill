@@ -7,14 +7,189 @@ export function normalizeType(t: string): string {
   return '사전기량검증';
 }
 
-export function formatYYYYMMDD(str: string): string {
+/**
+ * 응시번호 정규화:
+ * - 영문 대문자화
+ * - 영문과 숫자 사이에 하이픈('-') 무조건 삽입
+ * - 숫자는 3자리(001, 002, 010, 100 등)로 패딩
+ * 예: TM01 -> TM-001, TM-1 -> TM-001, C1 -> C-001, D-04 -> D-004, d18 -> D-018
+ */
+export function normalizeAppNo(raw: any): string {
+  if (raw === undefined || raw === null) return '';
+  let str = String(raw).trim().toUpperCase();
   if (!str) return '';
-  const s = String(str).trim();
-  const match = s.match(/(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/);
+  // 공백 및 언더바 제거
+  str = str.replace(/[\s_]+/g, '');
+  
+  // 영문 접두사 + (선택적 기호) + 숫자 + (선택적 접미사)
+  const match = str.match(/^([A-Z]+)[-_.]*(\d+)(.*)$/);
   if (match) {
-      return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+    const prefix = match[1];
+    const digits = match[2];
+    const suffix = match[3] || '';
+    const padded = digits.padStart(3, '0');
+    return `${prefix}-${padded}${suffix}`;
   }
-  return s.split(/[ T]/)[0].replace(/\./g, '-'); 
+
+  // 숫자만으로 시작하는 경우
+  const numMatch = str.match(/^(\d+)(.*)$/);
+  if (numMatch) {
+    const digits = numMatch[1];
+    const suffix = numMatch[2] || '';
+    const padded = digits.padStart(3, '0');
+    return `${padded}${suffix}`;
+  }
+
+  return str;
+}
+
+/**
+ * 성명 정규화:
+ * - 모든 영문 소문자를 대문자로 변환
+ * - 연속 공백 및 앞뒤 공백 제거
+ * 예: "phan huu cuong" -> "PHAN HUU CUONG"
+ */
+export function normalizeName(raw: any): string {
+  if (raw === undefined || raw === null) return '이름없음';
+  const s = String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+  return s || '이름없음';
+}
+
+/**
+ * 직종 정규화:
+ * - 용접, 선각취부, 의장취부 등으로 표준화
+ */
+export function normalizeJob(raw: any): string {
+  if (raw === undefined || raw === null) return '선각취부';
+  const s = String(raw).trim().replace(/\s+/g, '');
+  if (!s) return '선각취부';
+  if (s.includes('선각')) return '선각취부';
+  if (s.includes('의장')) return '의장취부';
+  if (s.includes('취부')) return '선각취부';
+  if (s.includes('용접')) return '용접';
+  return s;
+}
+
+/**
+ * 생년월일 정규화:
+ * - 19820611, 820611, 1982-06-11, 82-06-11, 1982.06.11, 82.06.11, 1982/06/11 등
+ * - 모든 형태를 YYYY-MM-DD (예: 1982-06-11) 형식으로 변환
+ * - 엑셀 시리얼 날짜 숫자도 자동 변환
+ */
+export function normalizeDob(raw: any): string {
+  if (raw === undefined || raw === null) return '';
+
+  // 1. 엑셀 숫자 시리얼 날짜 처리
+  if (typeof raw === 'number') {
+    if (raw > 10000 && raw < 80000) {
+      const date = new Date(Math.round((raw - 25569) * 86400 * 1000));
+      if (!isNaN(date.getTime())) {
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+
+  let s = String(raw).trim().replace(/\s/g, '');
+  if (!s) return '';
+
+  // 2. 8자리 숫자 (YYYYMMDD) 예: 19820611, 20060304
+  if (/^\d{8}$/.test(s)) {
+    const y = s.substring(0, 4);
+    const m = s.substring(4, 6);
+    const d = s.substring(6, 8);
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. 6자리 숫자 (YYMMDD) 예: 820611, 060304, 951130
+  if (/^\d{6}$/.test(s)) {
+    const yy = parseInt(s.substring(0, 2), 10);
+    const m = s.substring(2, 4);
+    const d = s.substring(4, 6);
+    const fullYear = yy <= 40 ? 2000 + yy : 1900 + yy;
+    return `${fullYear}-${m}-${d}`;
+  }
+
+  // 4. 구분자가 있는 4자리 연도: YYYY[./-]MM[./-]DD, YYYY[./-]M[./-]D
+  const match4 = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (match4) {
+    const y = match4[1];
+    const m = match4[2].padStart(2, '0');
+    const d = match4[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 5. 구분자가 있는 2자리 연도: YY[./-]MM[./-]DD, YY[./-]M[./-]D (예: 82-06-11, 82.06.11)
+  const match2 = s.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (match2) {
+    const yy = parseInt(match2[1], 10);
+    const m = match2[2].padStart(2, '0');
+    const d = match2[3].padStart(2, '0');
+    const fullYear = yy <= 40 ? 2000 + yy : 1900 + yy;
+    return `${fullYear}-${m}-${d}`;
+  }
+
+  // 6. 유럽/영미식 DD.MM.YYYY or DD/MM/YYYY
+  const matchEuro = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+  if (matchEuro) {
+    const d = matchEuro[1].padStart(2, '0');
+    const m = matchEuro[2].padStart(2, '0');
+    const y = matchEuro[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 7. 일반 Date 파싱
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1920 && parsed.getFullYear() < 2100) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  return s.split(/[ T]/)[0].replace(/\./g, '-');
+}
+
+/**
+ * 생년월일(YYYY-MM-DD) 기반 만 나이(International Age) 정확 계산
+ */
+export function calculateAge(dobStr: string, refDate: Date = new Date()): number {
+  if (!dobStr) return 0;
+  const normalized = normalizeDob(dobStr);
+  const parts = normalized.split('-');
+  if (parts.length < 3) return 0;
+  const birthYear = parseInt(parts[0], 10);
+  const birthMonth = parseInt(parts[1], 10);
+  const birthDay = parseInt(parts[2], 10);
+  if (isNaN(birthYear) || isNaN(birthMonth) || isNaN(birthDay)) return 0;
+
+  const currentYear = refDate.getFullYear();
+  const currentMonth = refDate.getMonth() + 1;
+  const currentDay = refDate.getDate();
+
+  let age = currentYear - birthYear;
+  if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
+    age--;
+  }
+  return age >= 0 ? age : 0;
+}
+
+/**
+ * E-9 여부 정규화 (O 또는 X)
+ */
+export function normalizeE9(raw: any): string {
+  if (raw === undefined || raw === null) return 'X';
+  const s = String(raw).toUpperCase().trim();
+  if (['O', '0', 'YES', 'Y', 'TRUE', '○', '유', '1'].some(k => s === k || s.includes(k))) {
+    return 'O';
+  }
+  return 'X';
+}
+
+export function formatYYYYMMDD(str: string): string {
+  return normalizeDob(str);
 }
 
 export function getSkillGradeByScore(val: number): string {

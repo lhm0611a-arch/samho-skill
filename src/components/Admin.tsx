@@ -753,6 +753,9 @@ function doPost(e) {
             }
             // 최종 판정(V열) 갱신
             targetSheet.getRange(rowIdx, 22).setValue("대기");
+            if (data.eval_date === '') {
+              targetSheet.getRange(rowIdx, 25).setValue('');
+            }
             break;
           }
         }

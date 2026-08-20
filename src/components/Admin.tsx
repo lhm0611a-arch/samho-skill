@@ -139,7 +139,7 @@ export default function Admin() {
               const candidateName = normalizeName(r[3]);
 
               // E열: 생년월일 (r[4]) -> 19820611, 820611, 82.06.11 등 어떠한 포맷도 1982-06-11로 정규화
-              const dob = normalizeDob(r[4]);
+              let dob = normalizeDob(r[4]);
 
               // F열: E-9 출신 여부 (r[5]) -> O 또는 X
               const e9 = normalizeE9(r[5]);
@@ -147,8 +147,11 @@ export default function Admin() {
               // 나이: 생년월일 기준 만 나이 자동 정확 계산
               let age = calculateAge(dob);
               if (age === 0 && r[6]) {
-                const parsedAge = parseInt(r[6]);
-                if (!isNaN(parsedAge) && parsedAge > 0) age = parsedAge;
+                const parsedAge = parseInt(String(r[6]).replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(parsedAge) && parsedAge >= 10 && parsedAge <= 90) age = parsedAge;
+              }
+              if (age > 0 && (!dob || dob.length < 10)) {
+                dob = `${new Date().getFullYear() - age}-01-01`;
               }
 
               // 평가일자 (r[24] 또는 오늘 날짜)

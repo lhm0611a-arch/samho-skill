@@ -144,13 +144,13 @@ export default function Admin() {
               // F열: E-9 출신 여부 (r[5]) -> O 또는 X
               const e9 = normalizeE9(r[5]);
 
-              // 나이: 생년월일 기준 만 나이 자동 정확 계산
+              // 나이: 생년월일 기준 만 나이 자동 정확 계산 (만 15세 이상)
               let age = calculateAge(dob);
-              if (age === 0 && r[6]) {
+              if ((age === 0 || age < 15) && r[6] !== undefined && r[6] !== null && String(r[6]).trim() !== '') {
                 const parsedAge = parseInt(String(r[6]).replace(/[^0-9]/g, ''), 10);
-                if (!isNaN(parsedAge) && parsedAge >= 10 && parsedAge <= 90) age = parsedAge;
+                if (!isNaN(parsedAge) && parsedAge >= 15 && parsedAge <= 90) age = parsedAge;
               }
-              if (age > 0 && (!dob || dob.length < 10)) {
+              if (age >= 15 && (!dob || dob.length < 10 || calculateAge(dob) < 15)) {
                 dob = `${new Date().getFullYear() - age}-01-01`;
               }
 

@@ -1,6 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Candidate, Log, UserRole, ViewType } from '../types';
-import { normalizeType, formatYYYYMMDD, getKoreanGrade, getKoreanPassText, checkKoreanPass, determineResult, getSkillGradeByScore } from '../lib/utils';
+import { 
+  normalizeType, 
+  formatYYYYMMDD, 
+  getKoreanGrade, 
+  getKoreanPassText, 
+  checkKoreanPass, 
+  determineResult, 
+  getSkillGradeByScore,
+  normalizeAppNo,
+  normalizeName,
+  normalizeJob,
+  normalizeDob,
+  calculateAge,
+  normalizeE9
+} from '../lib/utils';
 
 interface AppContextType {
   candidates: Candidate[];
@@ -117,14 +131,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       rawCandidates.forEach((d: any, index: number) => {
         const eType = normalizeType(d.eval_type);
-        const appNo = String(d.app_no || index).trim();
+        const appNo = normalizeAppNo(d.app_no || index);
         const country = String(d.country || '').trim();
         const agency = String(d.agency || '').trim();
         // Candidate key: combination of app_no, eval_type, country, agency
         const candKey = `${appNo}_${eType}_${country}_${agency}`;
 
         if (!deduplicatedMap.has(candKey)) {
-          deduplicatedMap.set(candKey, { ...d, _index: index });
+          deduplicatedMap.set(candKey, { ...d, app_no: appNo, _index: index });
         } else {
           // Merge: if existing has no date or lower score, prefer the more informative row
           const existing = deduplicatedMap.get(candKey);
@@ -132,9 +146,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                             ((Number(d.k_score) || 0) > (Number(existing.k_score) || 0)) ||
                             ((Number(d.s_score_weld) || 0) > (Number(existing.s_score_weld) || 0));
           if (preferNew) {
-            deduplicatedMap.set(candKey, { ...existing, ...d, _index: existing._index });
+            deduplicatedMap.set(candKey, { ...existing, ...d, app_no: appNo, _index: existing._index });
           } else {
-            deduplicatedMap.set(candKey, { ...d, ...existing });
+            deduplicatedMap.set(candKey, { ...d, ...existing, app_no: appNo });
           }
         }
       });
@@ -145,6 +159,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const mappedCandidates = uniqueCandidateList.map((d: any) => {
         const eType = normalizeType(d.eval_type);
         const fDate = formatYYYYMMDD(d.eval_date);
+        const appNo = normalizeAppNo(d.app_no);
+        const candName = normalizeName(d.name);
+        const job = normalizeJob(d.job);
+        const dob = normalizeDob(d.dob);
+        const e9 = normalizeE9(d.e9);
+        let age = calculateAge(dob);
+        if (age === 0 && d.age) {
+          const parsedAge = Number(d.age);
+          if (!isNaN(parsedAge) && parsedAge > 0) age = parsedAge;
+        }
         
         let k = Number(d.k_score) || 0;
         let s_w = Number(d.s_score_weld) || 0;
@@ -153,7 +177,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Group valid logs by evaluator (ignoring corrupted/empty evaluator entries)
         const applicantLogsAll = logs.filter(
           (l: any) =>
-            String(l.app_no).trim() === String(d.app_no).trim() &&
+            normalizeAppNo(l.app_no) === appNo &&
             normalizeType(l.eval_type) === eType &&
             l.evaluator && String(l.evaluator).trim() !== ''
         );
@@ -183,25 +207,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         
         const tempP = {
-            ...d, job: d.job, age: Number(d.age)||0, e9: d.e9, eval_type: eType,
-            k_score: k, s_score_weld: s_w, s_score_fit: s_f, s_status: s_stat
+            ...d, 
+            app_no: appNo,
+            job: job, 
+            name: candName,
+            dob: dob,
+            age: age, 
+            e9: e9, 
+            eval_type: eType,
+            k_score: k, 
+            s_score_weld: s_w, 
+            s_score_fit: s_f, 
+            s_status: s_stat
         };
         
         let k_g = k > 0 ? getKoreanGrade(k) : (d.k_grade && d.k_grade !== '-' ? d.k_grade : '-');
         let k_p = k > 0 ? getKoreanPassText(checkKoreanPass(tempP)) : (d.k_pass && d.k_pass !== '대기' && d.k_pass !== '' ? d.k_pass : '대기');
         const res = determineResult(tempP);
 
-        const originalName = String(d.name || '').trim();
-        const baseUid = `${d.app_no}_${originalName.toUpperCase()}_${eType}`;
+        const baseUid = `${appNo}_${candName}_${eType}`;
         const count = seenUids.get(baseUid) || 0;
         seenUids.set(baseUid, count + 1);
         const uniqueUid = count === 0 ? baseUid : `${baseUid}_${count}`;
 
         return {
             ...d,
-            name: originalName,
-            raw_name: originalName,
-            id: String(d.app_no), 
+            app_no: appNo,
+            name: candName,
+            raw_name: candName,
+            job: job,
+            dob: dob,
+            age: age,
+            e9: e9,
+            id: appNo, 
             uid: uniqueUid, 
             eval_type: eType,
             eval_date: fDate,

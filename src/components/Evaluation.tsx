@@ -257,15 +257,12 @@ export default function Evaluation() {
     return kVals;
   }
 
-  // Sync filter dropdowns when selected candidate changes (do not force showCompleted to true)
+  // Sync candidate selection (keep filter controls intact so all candidates remain visible)
   useEffect(() => {
     if (selectedUid) {
       const c = candidates.find((item) => item.uid === selectedUid);
       if (c) {
-        if (c.eval_type) setFilterType(c.eval_type);
-        if (c.eval_date) setFilterDate(c.eval_date);
-        if (c.country) setFilterCountry(c.country);
-        if (c.agency) setFilterAgency(c.agency);
+        // Never auto-lock filterDate to candidate's eval_date to avoid hiding unevaluated candidates
       }
     }
   }, [selectedUid, candidates]);
@@ -879,7 +876,11 @@ export default function Evaluation() {
     }
     const p = { ...currentCandidate };
     p.eval_type = normalizeType(p.eval_type);
-    p.eval_date = formatYYYYMMDD(p.eval_date || "");
+    
+    // Check if other evaluation category is still done
+    const isSkillStillDone = (p.s_status === "완료") || (Number(p.s_score_weld) || 0) > 0 || (Number(p.s_score_fit) || 0) > 0;
+    const isKoreanStillDone = (p.k_status === "완료") || (Number(p.k_score) || 0) > 0;
+
     let newLogs = globalLogs;
     if (currentTab === "korean") {
       p.k_score = 0;
@@ -901,6 +902,11 @@ export default function Evaluation() {
         localStorage.setItem("hd_logs", JSON.stringify(newLogs));
       } catch (e) {}
       setKVals([2, 2, 2, 2, 2, 2]);
+
+      // If skill evaluation is also not done, reset eval_date completely
+      if (!isSkillStillDone) {
+        p.eval_date = "";
+      }
     } else {
       p.s_score_weld = 0;
       p.grade_weld = "-";
@@ -911,6 +917,11 @@ export default function Evaluation() {
       setSWeld("");
       setSFit("");
       setSMemo("");
+
+      // If korean evaluation is also not done, reset eval_date completely
+      if (!isKoreanStillDone) {
+        p.eval_date = "";
+      }
     }
     p.result = determineResult(p);
     const updatedCandidates = candidates.map((c) =>
@@ -921,7 +932,10 @@ export default function Evaluation() {
       localStorage.setItem("hd_candidates", JSON.stringify(updatedCandidates));
     } catch (e) {}
 
-    showToast(`[${p.name}] 평가 내역이 '대기' 상태로 초기화되었습니다.`, "info");
+    // Reset date filter to 'all' so that all candidates (A~E) immediately appear in the evaluation pool
+    setFilterDate("all");
+
+    showToast(`[${p.name}] 평가 내역이 '대기' 상태로 초기화되었습니다. (응시일자 초기화 완료)`, "info");
 
     if (gasUrl && gasUrl.trim() !== "") {
       try {
@@ -936,7 +950,7 @@ export default function Evaluation() {
           no: p.no || "",
           eval_type: p.eval_type,
           name: String(p.raw_name || p.name || "").trim(),
-          eval_date: p.eval_date,
+          eval_date: p.eval_date || "", // Send empty string to clear Y column in Google Sheets
           evaluator: (evaluatorName && evaluatorName.trim() !== "") ? evaluatorName.trim() : "",
           evaluator_name: (evaluatorName && evaluatorName.trim() !== "") ? evaluatorName.trim() : "",
           k_score: 0,

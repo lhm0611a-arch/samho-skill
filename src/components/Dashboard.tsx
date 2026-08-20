@@ -3,7 +3,7 @@ import { SlidersHorizontal, Search, Languages, Hammer, ClipboardCheck, Filter, X
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { useAppContext } from '../context/AppContext';
-import { checkKoreanPass, checkSkillPass, determineResult, getBadgeHtml } from '../lib/utils';
+import { checkKoreanPass, checkSkillPass, determineResult, getBadgeHtml, calculateAge, normalizeDob } from '../lib/utils';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -305,7 +305,17 @@ export default function Dashboard() {
                                   <td className="font-bold text-slate-300 text-center tracking-wider text-xs md:text-sm px-1 md:px-2">{c.app_no}</td>
                                   <td className="font-black text-slate-100 text-center text-xs md:text-sm px-1 md:px-2">{c.name?.toUpperCase()}</td>
                                   <td className="text-slate-400 text-center font-bold text-xs md:text-sm px-1 md:px-2">{c.job}</td>
-                                  <td className="text-slate-400 text-xs md:text-sm text-center font-bold px-1 md:px-2">{c.age} / <span className={c.e9 === 'O' ? 'text-blue-400 font-black' : 'text-slate-600'}>{c.e9}</span></td>
+                                  <td className="text-slate-400 text-xs md:text-sm text-center font-bold px-1 md:px-2">
+                                    {(() => {
+                                      const ageVal = Number(c.age) || calculateAge(c.dob);
+                                      const ageText = ageVal > 0 ? `${ageVal}세` : (c.dob ? `${c.dob.slice(0, 4)}년` : "-");
+                                      return (
+                                        <span>
+                                          {ageText} / <span className={c.e9 === "O" ? "text-emerald-400 font-black" : "text-slate-500 font-bold"}>{c.e9 || "X"}</span>
+                                        </span>
+                                      );
+                                    })()}
+                                  </td>
                                   <td className="text-center font-black text-blue-400 text-xs md:text-sm px-1 md:px-2">{(c.k_score || 0) > 0 ? c.k_score : '-'}</td>
                                   <td className="text-center font-black text-hd-green tracking-tight text-xs md:text-sm px-1 md:px-2">
                                     {isSkillComplete(c) ? ((c.job || '').includes('취부') ? `W:${c.grade_weld} F:${c.grade_fit}` : c.grade_weld) : '-'}
@@ -342,7 +352,15 @@ export default function Dashboard() {
                                 <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm font-bold text-slate-400 mt-2 md:mt-3">
                                     <span className="flex items-center gap-1 md:gap-1.5"><MapPin className="w-3 h-3 md:w-4 md:h-4 text-blue-400" /> {selectedCandidate.country} / {selectedCandidate.agency}</span>
                                     <span className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-slate-700"></span>
-                                    <span>{selectedCandidate.age}세 (E-9 {selectedCandidate.e9})</span>
+                                    <span>
+                                      {(() => {
+                                        const ageVal = Number(selectedCandidate.age) || calculateAge(selectedCandidate.dob);
+                                        const y = selectedCandidate.dob ? selectedCandidate.dob.slice(0, 4) : "";
+                                        const ageText = ageVal > 0 ? `${ageVal}세` : (y ? `${y}년생` : "-");
+                                        const subText = ageVal > 0 && y ? ` (${y}년생)` : "";
+                                        return `${ageText}${subText} / E-9: ${selectedCandidate.e9 === "O" ? "유경험(O)" : "신규(X)"}`;
+                                      })()}
+                                    </span>
                                     <span className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-slate-700"></span>
                                     <span className="text-blue-300 font-black px-1.5 md:px-2 py-0.5 bg-blue-900/30 rounded">{selectedCandidate.job}</span>
                                 </div>

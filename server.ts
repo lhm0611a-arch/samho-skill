@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 
@@ -48,31 +49,12 @@ function saveTtsIndex() {
   }
 }
 
-// Helper: Convert PCM to standard WAV buffer
-function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1): Buffer {
-  const wavHeader = Buffer.alloc(44);
-  wavHeader.write('RIFF', 0);
-  wavHeader.writeUInt32LE(36 + pcmBuffer.length, 4);
-  wavHeader.write('WAVE', 8);
-  wavHeader.write('fmt ', 12);
-  wavHeader.writeUInt32LE(16, 16);
-  wavHeader.writeUInt16LE(1, 20); // Linear PCM
-  wavHeader.writeUInt16LE(numChannels, 22);
-  wavHeader.writeUInt32LE(sampleRate, 24);
-  wavHeader.writeUInt32LE(sampleRate * numChannels * 2, 28);
-  wavHeader.writeUInt16LE(numChannels * 2, 32);
-  wavHeader.writeUInt16LE(16, 34); // 16-bit
-  wavHeader.write('data', 36);
-  wavHeader.writeUInt32LE(pcmBuffer.length, 40);
-  return Buffer.concat([wavHeader, pcmBuffer]);
-}
-
-// Helper: Fetch Google Text-to-Speech API as high-reliability fallback
-async function fetchGoogleTTSAudio(text: string): Promise<{ buffer: Buffer; mimeType: string }> {
+// Helper: Fetch Google Text-to-Speech raw audio
+async function fetchGoogleTTSAudio(text: string): Promise<Buffer> {
   const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ko&client=tw-ob`;
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; AppleWebKit/537.36) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Referer': 'https://translate.google.com/'
     }
   });
@@ -80,10 +62,42 @@ async function fetchGoogleTTSAudio(text: string): Promise<{ buffer: Buffer; mime
     throw new Error(`Google TTS engine returned status ${res.status}`);
   }
   const arrayBuf = await res.arrayBuffer();
-  return {
-    buffer: Buffer.from(arrayBuf),
-    mimeType: 'audio/mpeg'
-  };
+  return Buffer.from(arrayBuf);
+}
+
+// Transform raw audio into distinct, clear, crisp male Korean interviewer voices
+// Eliminates muffled rumbling / animal-like bass distortion by using highpass filtering, vocal presence EQ, and crisp pitch scaling
+function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
+  const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const rawFile = `/tmp/raw_tts_${tmpId}.mp3`;
+  const outFile = `/tmp/out_tts_${tmpId}.mp3`;
+
+  try {
+    fs.writeFileSync(rawFile, rawMp3Buffer);
+
+    let filter = '';
+    if (voice === 'Charon') {
+      // 👨 AI 남성 2 (신뢰감 있는 면접관): 
+      // 120Hz 이하의 저음 뭉침을 방지하고, 2.8kHz~3.5kHz 영역을 부스팅하여 발음(자음/모음)이 또렷하고 분명하게 들리는 남성 톤
+      filter = 'highpass=f=120,asetrate=24000*0.89,atempo=1.12,equalizer=f=3000:width_type=o:width=1.0:g=3.5,equalizer=f=4500:width_type=o:width=1.0:g=2.0,volume=1.25,dynaudnorm=f=50:g=11';
+    } else {
+      // 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본):
+      // 아주 자연스럽고 깨끗한 표준 남성 면접관 발화 톤
+      filter = 'highpass=f=110,asetrate=24000*0.92,atempo=1.085,equalizer=f=3200:width_type=o:width=1.0:g=3.0,equalizer=f=1500:width_type=o:width=1.0:g=1.5,volume=1.20,dynaudnorm=f=50:g=11';
+    }
+
+    execSync(`ffmpeg -y -i ${rawFile} -filter:a "${filter}" -b:a 96k ${outFile}`, { stdio: 'ignore' });
+    const processedBuffer = fs.readFileSync(outFile);
+    return processedBuffer;
+  } catch (e: any) {
+    console.warn('FFmpeg voice processing fallback:', e.message);
+    return rawMp3Buffer;
+  } finally {
+    try {
+      if (fs.existsSync(rawFile)) fs.unlinkSync(rawFile);
+      if (fs.existsSync(outFile)) fs.unlinkSync(outFile);
+    } catch (_) {}
+  }
 }
 
 app.post('/api/generate-questions', async (req, res) => {
@@ -140,10 +154,10 @@ app.post('/api/generate-questions', async (req, res) => {
   }
 });
 
-// TTS Synthesis & Persistent Audio Cache Handler
+// TTS Synthesis & Persistent Audio Cache Handler (Male Interviewers Only)
 app.post('/api/tts', async (req, res) => {
   try {
-    const { text, voice = 'Puck' } = req.body;
+    const { text, voice = 'Fenrir' } = req.body;
     
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Text parameter is required.' });
@@ -151,11 +165,21 @@ app.post('/api/tts', async (req, res) => {
 
     // Clean text key
     const cleanKey = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
-    const validVoice = ['Puck', 'Fenrir', 'Charon', 'Aoede', 'Kore'].includes(voice) ? voice : 'Puck';
     
-    // Generate unique hash key for this text and voice
-    const hash = crypto.createHash('sha256').update(`${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
-    const cacheKey = `${validVoice}_${cleanKey}`;
+    // Normalize voice selection to Male voices:
+    // 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
+    // 'Charon': 👨 AI 남성 2 (신뢰감 있는 면접관)
+    let validVoice = 'Fenrir';
+    if (voice === 'Charon') {
+      validVoice = 'Charon';
+    } else {
+      validVoice = 'Fenrir';
+    }
+    
+    // Versioned hash key for audio caching
+    const cacheVersion = 'v3_crisp_male';
+    const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
+    const cacheKey = `${cacheVersion}_${validVoice}_${cleanKey}`;
 
     // 1. Check if audio is already saved on server disk
     if (serverTtsIndex.has(cacheKey)) {
@@ -173,19 +197,8 @@ app.post('/api/tts', async (req, res) => {
     }
 
     // Check direct file existence by hash
-    const possibleWav = path.join(CACHE_DIR, `${hash}.wav`);
     const possibleMp3 = path.join(CACHE_DIR, `${hash}.mp3`);
-    if (fs.existsSync(possibleWav)) {
-      const fileBuffer = fs.readFileSync(possibleWav);
-      serverTtsIndex.set(cacheKey, { filename: `${hash}.wav`, mimeType: 'audio/wav' });
-      saveTtsIndex();
-      return res.json({
-        audioBase64: fileBuffer.toString('base64'),
-        mimeType: 'audio/wav',
-        cached: true,
-        source: 'server_disk'
-      });
-    } else if (fs.existsSync(possibleMp3)) {
+    if (fs.existsSync(possibleMp3)) {
       const fileBuffer = fs.readFileSync(possibleMp3);
       serverTtsIndex.set(cacheKey, { filename: `${hash}.mp3`, mimeType: 'audio/mpeg' });
       saveTtsIndex();
@@ -197,75 +210,30 @@ app.post('/api/tts', async (req, res) => {
       });
     }
 
-    // 2. Generate Audio (First attempt: Gemini AI Voice; Fallback: Google Voice)
+    // 2. Generate crisp, high-definition male voice audio
     let finalBuffer: Buffer | null = null;
-    let finalMimeType = 'audio/wav';
-    let fileExt = 'wav';
+    const rawAudioBuffer = await fetchGoogleTTSAudio(cleanKey);
+    finalBuffer = processVoiceAudio(rawAudioBuffer, validVoice);
 
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-tts-preview',
-          contents: [{ parts: [{ text: cleanKey }] }],
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: validVoice }
-              }
-            }
-          }
-        } as any);
-
-        const inlineData = response?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-        if (inlineData && inlineData.data) {
-          const rawBase64 = inlineData.data;
-          const rawMime = inlineData.mimeType || 'audio/l16';
-          
-          if (rawMime.includes('audio/l16') || rawMime.includes('audio/pcm')) {
-            const pcmBuffer = Buffer.from(rawBase64, 'base64');
-            finalBuffer = pcmToWav(pcmBuffer, 24000, 1);
-            finalMimeType = 'audio/wav';
-            fileExt = 'wav';
-          } else {
-            finalBuffer = Buffer.from(rawBase64, 'base64');
-            finalMimeType = rawMime;
-            fileExt = rawMime.includes('mp3') ? 'mp3' : 'wav';
-          }
-        }
-      } catch (geminiErr: any) {
-        console.warn('Gemini TTS synthesis attempt failed or quota reached, switching to high-quality fallback engine:', geminiErr.message);
-      }
-    }
-
-    // If Gemini TTS was not available or failed, use Google Voice TTS fallback
     if (!finalBuffer) {
-      try {
-        const googleAudio = await fetchGoogleTTSAudio(cleanKey);
-        finalBuffer = googleAudio.buffer;
-        finalMimeType = googleAudio.mimeType;
-        fileExt = 'mp3';
-      } catch (fallbackErr: any) {
-        console.error('All TTS engines failed:', fallbackErr);
-        return res.status(500).json({ error: '음성 합성 생성에 실패했습니다.' });
-      }
+      return res.status(500).json({ error: '음성 생성에 실패했습니다.' });
     }
 
     // 3. Save permanently to server disk cache
-    const targetFilename = `${hash}.${fileExt}`;
+    const targetFilename = `${hash}.mp3`;
     const targetFilePath = path.join(CACHE_DIR, targetFilename);
     fs.writeFileSync(targetFilePath, finalBuffer);
 
     // Update index & save
-    serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: finalMimeType });
+    serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });
     saveTtsIndex();
 
-    console.log(`[TTS Cache Saved] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 20)}..." | Size: ${finalBuffer.length} bytes -> ${targetFilename}`);
+    console.log(`[TTS Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
 
     // 4. Return audio to client
     return res.json({
       audioBase64: finalBuffer.toString('base64'),
-      mimeType: finalMimeType,
+      mimeType: 'audio/mpeg',
       cached: false,
       savedOnServer: true
     });
@@ -306,4 +274,3 @@ async function startServer() {
 }
 
 startServer();
-

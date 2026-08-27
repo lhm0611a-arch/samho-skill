@@ -42,7 +42,7 @@ import {
   calculateAge,
   normalizeDob,
 } from "../lib/utils";
-import { playTTS, stopTTS, getTTSVoice, setTTSVoice } from "../lib/speech";
+import { playTTS, stopTTS, getTTSVoice, setTTSVoice, TTSVoiceType } from "../lib/speech";
 
 export default function Evaluation() {
   const {
@@ -267,14 +267,13 @@ export default function Evaluation() {
     }
   }, [selectedUid, candidates]);
 
-  // Candidate pool based on showCompleted toggle or explicitly selected UID
+  // Candidate pool based on showCompleted toggle
   const evalPoolCandidates = useMemo(() => {
     return candidates.filter((c) => {
       if (showCompleted) return true;
-      if (selectedUid && c.uid === selectedUid) return true;
       return !isCandidateCompleted(c);
     });
-  }, [candidates, showCompleted, selectedUid, isCandidateCompleted]);
+  }, [candidates, showCompleted, isCandidateCompleted]);
 
   const validTypes = useMemo(
     () =>
@@ -377,7 +376,6 @@ export default function Evaluation() {
   const filteredCandidates = useMemo(() => {
     return evalPoolCandidates
       .filter((c) => {
-        if (selectedUid && c.uid === selectedUid) return true;
         if (filterType !== "all" && c.eval_type !== filterType) return false;
         if (filterDate !== "all" && c.eval_date !== filterDate) return false;
         if (filterCountry !== "all" && c.country !== filterCountry)
@@ -396,7 +394,6 @@ export default function Evaluation() {
     filterDate,
     filterCountry,
     filterAgency,
-    selectedUid,
   ]);
 
   useEffect(() => {
@@ -515,10 +512,8 @@ export default function Evaluation() {
   };
 
   const [playingTTS, setPlayingTTS] = useState<string | null>(null);
-  const [selectedVoice, setSelectedVoice] = useState<'Puck' | 'Aoede'>(() => {
-    const v = getTTSVoice();
-    if (v === 'Puck' || v === 'Aoede') return v;
-    return 'Puck';
+  const [selectedVoice, setSelectedVoice] = useState<TTSVoiceType>(() => {
+    return getTTSVoice();
   });
 
   useEffect(() => {
@@ -1062,7 +1057,20 @@ export default function Evaluation() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterType(val);
+                const matches = evalPoolCandidates.filter(
+                  (c) =>
+                    (val === "all" || c.eval_type === val) &&
+                    (filterDate === "all" || c.eval_date === filterDate) &&
+                    (filterCountry === "all" || c.country === filterCountry) &&
+                    (filterAgency === "all" || c.agency === filterAgency),
+                );
+                if (matches.length > 0) {
+                  setSelectedUid(matches[0].uid);
+                }
+              }}
               className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
@@ -1080,7 +1088,20 @@ export default function Evaluation() {
             </select>
             <select
               value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterDate(val);
+                const matches = evalPoolCandidates.filter(
+                  (c) =>
+                    (filterType === "all" || c.eval_type === filterType) &&
+                    (val === "all" || c.eval_date === val) &&
+                    (filterCountry === "all" || c.country === filterCountry) &&
+                    (filterAgency === "all" || c.agency === filterAgency),
+                );
+                if (matches.length > 0) {
+                  setSelectedUid(matches[0].uid);
+                }
+              }}
               className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[110px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
@@ -1094,7 +1115,20 @@ export default function Evaluation() {
             </select>
             <select
               value={filterCountry}
-              onChange={(e) => setFilterCountry(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterCountry(val);
+                const matches = evalPoolCandidates.filter(
+                  (c) =>
+                    (filterType === "all" || c.eval_type === filterType) &&
+                    (filterDate === "all" || c.eval_date === filterDate) &&
+                    (val === "all" || c.country === val) &&
+                    (filterAgency === "all" || c.agency === filterAgency),
+                );
+                if (matches.length > 0) {
+                  setSelectedUid(matches[0].uid);
+                }
+              }}
               className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
@@ -1108,7 +1142,20 @@ export default function Evaluation() {
             </select>
             <select
               value={filterAgency}
-              onChange={(e) => setFilterAgency(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterAgency(val);
+                const matches = evalPoolCandidates.filter(
+                  (c) =>
+                    (filterType === "all" || c.eval_type === filterType) &&
+                    (filterDate === "all" || c.eval_date === filterDate) &&
+                    (filterCountry === "all" || c.country === filterCountry) &&
+                    (val === "all" || c.agency === val),
+                );
+                if (matches.length > 0) {
+                  setSelectedUid(matches[0].uid);
+                }
+              }}
               className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
             >
               <option value="all">
@@ -1125,7 +1172,21 @@ export default function Evaluation() {
               <input
                 type="checkbox"
                 checked={showCompleted}
-                onChange={(e) => setShowCompleted(e.target.checked)}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setShowCompleted(val);
+                  const newPool = candidates.filter((c) => val || !isCandidateCompleted(c));
+                  const matches = newPool.filter(
+                    (c) =>
+                      (filterType === "all" || c.eval_type === filterType) &&
+                      (filterDate === "all" || c.eval_date === filterDate) &&
+                      (filterCountry === "all" || c.country === filterCountry) &&
+                      (filterAgency === "all" || c.agency === filterAgency),
+                  );
+                  if (matches.length > 0) {
+                    setSelectedUid(matches[0].uid);
+                  }
+                }}
                 className="rounded bg-[#051326] border-[#1e3a5f] text-blue-500 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
               />
               <span>완료자 포함</span>
@@ -1289,42 +1350,46 @@ export default function Evaluation() {
         <div
           className={`dx-card ${userRole === "interviewer" ? "w-full" : "w-full md:w-5/12"} flex-[1] md:flex-none flex flex-col relative min-h-0 overflow-hidden bg-[#08172c]`}
         >
-          <div className="p-3 md:p-4 border-b border-[#1e3a5f] bg-[#051326] flex flex-wrap justify-between items-center gap-2 sticky top-0 z-10">
-            <div className="flex items-center gap-2">
-              <span className="font-black text-slate-100 text-sm md:text-base flex items-center gap-2" style={{ textAlign: 'left' }}>
-                <FileQuestion className="text-blue-400 w-4 h-4 md:w-5 md:h-5" /> 인터뷰 문항
+          <div className="px-2.5 py-2 md:px-3.5 md:py-2.5 border-b border-[#1e3a5f] bg-[#051326] flex flex-nowrap justify-between items-center gap-1.5 md:gap-2 sticky top-0 z-10 w-full overflow-hidden">
+            <div className="flex items-center gap-1.5 md:gap-2 min-w-0 shrink">
+              <span className="font-black text-slate-100 text-xs md:text-sm flex items-center gap-1.5 shrink-0" style={{ textAlign: 'left' }}>
+                <FileQuestion className="text-blue-400 w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline whitespace-nowrap">인터뷰 문항</span>
               </span>
               <select
                 value={selectedVoice}
                 onChange={(e) => {
-                  const v = e.target.value as 'Puck' | 'Aoede';
+                  const v = e.target.value as TTSVoiceType;
                   setSelectedVoice(v);
                   setTTSVoice(v);
                 }}
-                className="bg-[#0a1b35] text-[11px] md:text-xs font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-2.5 py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors"
-                title="AI 음성 선택 (남성 / 여성)"
+                className="bg-[#0a1b35] text-[11px] md:text-xs font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-2 py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors shrink min-w-0 truncate max-w-[140px] sm:max-w-[170px] xl:max-w-[200px]"
+                title="AI 면접관 음성 선택"
               >
-                <option value="Puck">👨 AI 남성 목소리</option>
-                <option value="Aoede">👩 AI 여성 목소리</option>
+                <option value="Fenrir">👨 남성 1 (차분·또렷)</option>
+                <option value="Charon">👨 남성 2 (신뢰감)</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
               <button
                 onClick={() => manualShuffle()}
-                className="bg-[#0a1b35] border border-[#1e3a5f] hover:bg-[#1e3a5f] text-slate-300 px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1 md:gap-1.5 shadow-sm"
+                className="bg-[#0a1b35] border border-[#1e3a5f] hover:bg-[#1e3a5f] text-slate-300 px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm shrink-0"
+                title="문항 무작위 셔플"
               >
-                <Shuffle className="w-3 h-3 md:w-4 md:h-4" />{" "}
-                <span className="hidden xl:inline">문항 셔플</span>
+                <Shuffle className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden 2xl:inline whitespace-nowrap">셔플</span>
               </button>
-              <div className="flex items-center gap-1 md:gap-2 bg-[#0a1b35] px-2 py-1 rounded-lg border border-[#1e3a5f] shadow-sm ml-1">
-                <span className="px-1 md:px-2 text-xs md:text-sm font-bold text-slate-300 tracking-wide" style={{ textAlign: 'center', fontSize: '12px' }}>
-                  {qPage + 1} / 3 (SET {(qSets[qPage] || 0) + 1})
+              <div className="flex items-center bg-[#0a1b35] px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg border border-[#1e3a5f] shadow-sm shrink-0">
+                <span className="text-[11px] md:text-xs font-bold text-slate-300 whitespace-nowrap tracking-tight">
+                  {qPage + 1}/3
+                  <span className="text-slate-400 font-normal ml-0.5 text-[10px] md:text-[11px]">(SET {(qSets[qPage] || 0) + 1})</span>
                 </span>
                 <button
                   onClick={() => setQPage((prev) => (prev + 1) % 3)}
-                  className="hover:bg-[#1e3a5f] text-slate-400 hover:text-slate-200 w-6 h-6 md:w-7 md:h-7 rounded-md flex items-center justify-center transition-colors"
+                  className="hover:bg-[#1e3a5f] text-slate-400 hover:text-slate-200 w-5 h-5 md:w-6 md:h-6 rounded flex items-center justify-center transition-colors ml-0.5"
+                  title="다음 문항 세트 (1~3)"
                 >
-                  <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+                  <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </button>
               </div>
             </div>

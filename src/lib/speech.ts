@@ -1,65 +1,66 @@
-// High-Fidelity AI Human Voice TTS Engine
-// Uses Google Gemini AI Audio TTS as primary with persistent server disk caching and high-quality fallback.
+// High-Fidelity AI Voice TTS Engine (Male Interviewer Dedicated)
+// Uses High-Definition Audio TTS with persistent server disk caching and high-quality fallback.
 
 const audioCache = new Map<string, HTMLAudioElement>();
 
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 let currentAudio: HTMLAudioElement | null = null;
 
-// Stored preferred AI voice: 'Puck' (친절하고 또렷한 남성 AI - 기본), 'Fenrir' (신뢰감 있는 중후한 남성 AI), 'Aoede' (자연스러운 여성 AI), 'Kore' (차분한 여성 AI)
-let currentVoice: string = typeof window !== 'undefined' ? (localStorage.getItem('hd_tts_voice') || 'Puck') : 'Puck';
+// Male AI Interviewer Voices:
+// 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
+// 'Charon': 👨 AI 남성 2 (신뢰감 있는 면접관)
+export type TTSVoiceType = 'Fenrir' | 'Charon';
 
-export function setTTSVoice(voice: 'Puck' | 'Fenrir' | 'Aoede' | 'Kore') {
-  currentVoice = voice;
+let currentVoice: TTSVoiceType = typeof window !== 'undefined' 
+  ? (() => {
+      const saved = localStorage.getItem('hd_tts_voice');
+      if (saved === 'Charon' || saved === 'Fenrir') return saved;
+      return 'Fenrir';
+    })()
+  : 'Fenrir';
+
+export function setTTSVoice(voice: TTSVoiceType | string) {
+  let normalized: TTSVoiceType = 'Fenrir';
+  if (voice === 'Charon') normalized = 'Charon';
+  else normalized = 'Fenrir';
+
+  currentVoice = normalized;
   if (typeof window !== 'undefined') {
-    localStorage.setItem('hd_tts_voice', voice);
+    localStorage.setItem('hd_tts_voice', normalized);
   }
 }
 
-export function getTTSVoice(): string {
+export function getTTSVoice(): TTSVoiceType {
   return currentVoice;
 }
 
-// Get best Korean voice available in the browser (for offline fallback)
+// Get best Korean male voice available in the browser (for offline fallback)
 function getKoreanVoice(): SpeechSynthesisVoice | null {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
   const voices = window.speechSynthesis.getVoices();
   
-  // Prefer Korean Male voice if available for male profile
-  const isMaleSelected = currentVoice === 'Puck' || currentVoice === 'Fenrir';
-  if (isMaleSelected) {
-    const maleKo = voices.find(v => 
-      v.lang.startsWith('ko') && (
-        v.name.includes('Male') ||
-        v.name.includes('남성') ||
-        v.name.includes('InJoon') ||
-        v.name.includes('BongJin') ||
-        v.name.includes('MinHo') ||
-        v.name.includes('Gihun')
-      )
-    );
-    if (maleKo) return maleKo;
-  }
-
-  const preferredKo = voices.find(v => 
+  // Look specifically for Male Korean voices in Windows, Mac, Android, iOS
+  const maleKo = voices.find(v => 
     v.lang.startsWith('ko') && (
-      v.name.includes('Google') || 
-      v.name.includes('Natural') || 
-      v.name.includes('Online') || 
-      v.name.includes('Premium') ||
-      v.name.includes('Sun-Hi') ||
-      v.name.includes('Heami') ||
-      v.name.includes('Yuna')
+      v.name.toLowerCase().includes('male') ||
+      v.name.includes('남성') ||
+      v.name.includes('InJoon') ||
+      v.name.includes('BongJin') ||
+      v.name.includes('MinHo') ||
+      v.name.includes('Gihun') ||
+      v.name.includes('Hyun')
     )
   );
-  if (preferredKo) return preferredKo;
+  if (maleKo) return maleKo;
 
-  const anyKo = voices.find(v => v.lang.startsWith('ko') || v.lang.includes('KR'));
+  // Fallback to any Korean voice
+  const anyKo = voices.find(v => v.lang.startsWith('ko'));
   if (anyKo) return anyKo;
 
   return null;
 }
 
+// Pre-load speech synthesis voices
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => {
     getKoreanVoice();
@@ -67,106 +68,156 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 }
 
 /**
- * Play text using High-Fidelity AI Human Voice (Google / Gemini TTS).
- * Uses server-cached audio (0 tokens on repeat/cross-device playback).
- * Falls back to browser Web Speech API if server TTS is unreachable.
+ * Stop any ongoing TTS audio immediately
  */
-export function playTTS(
+export function stopTTS() {
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio.src = '';
+    } catch (_) {}
+    currentAudio = null;
+  }
+
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (_) {}
+    currentUtterance = null;
+  }
+}
+
+/**
+ * Speak text with clear, crisp, natural Korean voice
+ */
+export function speakText(
   text: string,
   callbacks?: {
     onStart?: () => void;
     onEnd?: () => void;
     onError?: (err?: any) => void;
   },
-  voiceOption?: 'Puck' | 'Fenrir' | 'Aoede' | 'Kore'
+  voiceOverride?: TTSVoiceType
 ): () => void {
-  const cleanText = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').trim();
+  // Stop previous playback
+  stopTTS();
+
+  const voiceTarget = voiceOverride || currentVoice;
+
+  // Clean text: remove [신규] tags and format arrows
+  const cleanText = text
+    .replace(/\[신규\]/g, '')
+    .replace(/→/g, ' 그리고 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   if (!cleanText) {
     callbacks?.onEnd?.();
     return () => {};
   }
 
-  // Stop any currently playing audio/speech
-  stopTTS();
+  let cancelled = false;
 
-  const voiceToUse = voiceOption || currentVoice || 'Puck';
-  const cacheKey = `${voiceToUse}_${cleanText}`;
+  const cacheKey = `v3_${voiceTarget}_${cleanText}`;
 
-  // 1. Primary: Cached High-Fidelity Audio in Client Memory
+  // 1. Check client-side audio memory cache first
   if (audioCache.has(cacheKey)) {
-    try {
-      const cachedAudio = audioCache.get(cacheKey)!;
-      cachedAudio.currentTime = 0;
-      currentAudio = cachedAudio;
-      callbacks?.onStart?.();
-      cachedAudio.onended = () => {
-        currentAudio = null;
-        callbacks?.onEnd?.();
-      };
-      cachedAudio.onerror = () => {
-        currentAudio = null;
-        callbacks?.onError?.();
-      };
-      cachedAudio.play().catch(() => {
-        playFallbackBrowserSpeech(cleanText, callbacks);
-      });
-      return () => stopTTS();
-    } catch (e) {
-      console.warn('Cached audio playback failed, fetching fresh audio', e);
-    }
+    const cachedAudio = audioCache.get(cacheKey)!;
+    cachedAudio.currentTime = 0;
+    currentAudio = cachedAudio;
+
+    cachedAudio.onplay = () => {
+      if (!cancelled) callbacks?.onStart?.();
+    };
+    cachedAudio.onended = () => {
+      currentAudio = null;
+      if (!cancelled) callbacks?.onEnd?.();
+    };
+    cachedAudio.onerror = (e) => {
+      console.warn('Cached audio playback failed, falling back:', e);
+      currentAudio = null;
+      if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+    };
+
+    cachedAudio.play().catch(e => {
+      console.warn('Cached audio play promise rejected, using fallback:', e);
+      if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+    });
+
+    return () => {
+      cancelled = true;
+      stopTTS();
+    };
   }
 
-  // 2. Fetch High-Fidelity AI Voice from Server (which serves from persistent disk cache or synthesizes once)
-  callbacks?.onStart?.();
-  let cancelled = false;
+  // 2. Fetch from backend TTS endpoint (persisted server audio)
+  const fetchController = new AbortController();
 
   fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: cleanText, voice: voiceToUse })
+    body: JSON.stringify({ text: cleanText, voice: voiceTarget }),
+    signal: fetchController.signal
   })
     .then(async (res) => {
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || errorData.error || `HTTP ${res.status}`);
+        throw new Error(`Server TTS returned HTTP ${res.status}`);
       }
       return res.json();
     })
-    .then(data => {
+    .then((data) => {
       if (cancelled) return;
-      if (data.audioBase64) {
-        const audio = new Audio(`data:${data.mimeType || 'audio/wav'};base64,${data.audioBase64}`);
-        audioCache.set(cacheKey, audio);
-        currentAudio = audio;
+
+      if (data?.audioBase64) {
+        const audioSrc = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audioBase64}`;
+        const audio = new Audio(audioSrc);
+        audio.preload = 'auto';
+
+        audio.onplay = () => {
+          if (!cancelled) callbacks?.onStart?.();
+        };
+
         audio.onended = () => {
           currentAudio = null;
-          callbacks?.onEnd?.();
+          if (!cancelled) callbacks?.onEnd?.();
         };
-        audio.onerror = () => {
+
+        audio.onerror = (e) => {
+          console.warn('Audio playback error, falling back to Web Speech:', e);
           currentAudio = null;
-          playFallbackBrowserSpeech(cleanText, callbacks);
+          if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
         };
-        audio.play().catch(() => {
-          playFallbackBrowserSpeech(cleanText, callbacks);
+
+        // Cache in client memory
+        audioCache.set(cacheKey, audio);
+        currentAudio = audio;
+
+        audio.play().catch(err => {
+          console.warn('Audio play() rejected, trying Web Speech fallback:', err);
+          if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
         });
       } else {
-        throw new Error(data.error || '음성 생성 응답 없음');
+        throw new Error('No audio data received from server');
       }
     })
-    .catch(err => {
+    .catch((err) => {
       if (cancelled) return;
-      console.warn('Server TTS unavailable, falling back to browser speech:', err.message);
-      playFallbackBrowserSpeech(cleanText, callbacks);
+      if (err.name !== 'AbortError') {
+        console.warn('Server TTS failed, falling back to browser speech:', err);
+        playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+      }
     });
 
   return () => {
     cancelled = true;
+    fetchController.abort();
     stopTTS();
   };
 }
 
 /**
- * Fallback to browser Web Speech API with optimized parameters
+ * Fallback to browser Web Speech API with clean, natural male pronunciation
  */
 function playFallbackBrowserSpeech(
   cleanText: string,
@@ -174,7 +225,8 @@ function playFallbackBrowserSpeech(
     onStart?: () => void;
     onEnd?: () => void;
     onError?: (err?: any) => void;
-  }
+  },
+  voiceTarget: TTSVoiceType = currentVoice
 ) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     callbacks?.onEnd?.();
@@ -187,10 +239,9 @@ function playFallbackBrowserSpeech(
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'ko-KR';
     
-    // Set pitch & rate for natural male tone
-    const isMale = currentVoice === 'Puck' || currentVoice === 'Fenrir';
-    utterance.rate = 0.95;
-    utterance.pitch = isMale ? 0.95 : 1.1;
+    // Male voice settings: articulate tempo and clean pitch
+    utterance.rate = voiceTarget === 'Fenrir' ? 0.95 : 0.92;
+    utterance.pitch = voiceTarget === 'Fenrir' ? 0.94 : 0.88; 
 
     const koVoice = getKoreanVoice();
     if (koVoice) {
@@ -221,20 +272,10 @@ function playFallbackBrowserSpeech(
 }
 
 /**
- * Stop currently playing TTS audio immediately
+ * Stop any current speech
  */
-export function stopTTS() {
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (e) {}
-  }
-  if (currentAudio) {
-    try {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-    } catch (e) {}
-    currentAudio = null;
-  }
-  currentUtterance = null;
+export function stopSpeech() {
+  stopTTS();
 }
+
+export const playTTS = speakText;

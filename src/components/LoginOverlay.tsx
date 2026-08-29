@@ -52,7 +52,7 @@ export default function LoginOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900 bg-cover bg-center animate-in fade-in duration-500 font-kor" style={{ backgroundImage: "url('/yard.jpg')" }}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900 bg-cover bg-center animate-in fade-in duration-500 font-kor" style={{ backgroundImage: "url('/yard.png'), url('/yard.jpg')" }}>
       {/* Premium dark overlay with gradient matching the reference */}
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[4px]"></div>
       

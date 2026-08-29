@@ -145,10 +145,12 @@ export function speakText(
 
   const voiceTarget = voiceOverride || currentVoice;
 
-  // Clean text: remove [신규] tags and format arrows
+  // Clean text: remove [신규] tags, convert arrows, remove parentheses/brackets smoothly
   const cleanText = text
     .replace(/\[신규\]/g, '')
+    .replace(/\[[^\]]*\]/g, '')
     .replace(/→/g, ' 그리고 ')
+    .replace(/[()（）]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 

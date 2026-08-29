@@ -150,6 +150,31 @@
   .res-fail { background-color: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
   .res-wait { background-color: rgba(100, 116, 139, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
 
+  /* Custom Visible Scrollbars for High Usability */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3b82f6 #051326;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #051326;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2563eb;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6;
+  }
+
   /* Utils */
   .hl-red { color: #f87171; font-weight: 800; border-bottom: 1px dashed #ef4444; background: rgba(239, 68, 68, 0.1); padding: 0 4px; border-radius: 4px; }
   .pb-safe { padding-bottom: max(2rem, env(safe-area-inset-bottom)) !important; }

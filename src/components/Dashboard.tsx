@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   SlidersHorizontal, 
   Search, 
@@ -41,18 +42,50 @@ export default function Dashboard() {
   const [sortAsc, setSortAsc] = useState(true);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
 
+  const dateButtonRef = useRef<HTMLButtonElement>(null);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  // Update date dropdown position and handle resize/scroll
+  useEffect(() => {
+    if (isDateOpen && dateButtonRef.current) {
+      const updatePosition = () => {
+        if (!dateButtonRef.current) return;
+        const rect = dateButtonRef.current.getBoundingClientRect();
+        const popoverWidth = Math.min(window.innerWidth - 20, 320);
+        let left = rect.left;
+        if (left + popoverWidth > window.innerWidth - 10) {
+          left = Math.max(10, window.innerWidth - popoverWidth - 10);
+        }
+        setDropdownPos({
+          top: rect.bottom + 6,
+          left: Math.max(8, left)
+        });
+      };
+
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      return () => window.removeEventListener('resize', updatePosition);
+    }
+  }, [isDateOpen]);
 
   // Close date dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dateDropdownRef.current && !dateDropdownRef.current.contains(event.target as Node)) {
+      if (
+        dateDropdownRef.current && 
+        !dateDropdownRef.current.contains(event.target as Node) &&
+        dateButtonRef.current &&
+        !dateButtonRef.current.contains(event.target as Node)
+      ) {
         setIsDateOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isDateOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isDateOpen]);
 
   // Helper to reliably resolve evaluation date
   const getCandidateDate = (c: any): string => {
@@ -258,153 +291,67 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-2 lg:p-4 animate-in fade-in max-w-[1600px] mx-auto w-full relative z-10">
-      <div className="shrink-0">
-        {/* Filters */}
-        <div className="mb-3 flex flex-wrap gap-3 md:gap-4 items-center justify-between dx-card px-3 md:px-4 py-2.5 border-t-4 border-t-blue-500">
-          <div className="flex flex-col md:flex-row flex-wrap gap-2 md:gap-3 items-start md:items-center min-h-[45px] w-full xl:w-auto">
-            <span className="text-sm md:text-base font-black text-blue-400 px-1 md:px-2 flex items-center gap-1.5 md:gap-2 tracking-tight whitespace-nowrap">
-              <SlidersHorizontal className="w-4 h-4 md:w-5 md:h-5 text-hd-green" /> 데이터 필터
-            </span>
-            <div className="hidden md:block h-4 md:h-6 w-px bg-slate-700 mx-0.5 md:mx-1"></div>
-            
-            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 w-full md:w-auto items-center">
-              {/* 1. Evaluation Type */}
+      <div className="shrink-0 relative z-30">
+        {/* Filters Bar - Fixed 1-line responsive layout */}
+        <div className="mb-3 dx-card px-2.5 sm:px-3 md:px-4 py-2 border-t-4 border-t-blue-500 relative z-30 overflow-x-auto custom-scrollbar no-scrollbar">
+          <div className="flex items-center justify-between gap-2 md:gap-3 min-w-max w-full">
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 shrink-0">
+              <span className="text-xs sm:text-sm md:text-base font-black text-blue-400 px-1 flex items-center gap-1.5 md:gap-2 tracking-tight whitespace-nowrap shrink-0">
+                <SlidersHorizontal className="w-4 h-4 md:w-5 md:h-5 text-hd-green shrink-0" /> 데이터 필터
+              </span>
+              <div className="h-4 md:h-5 w-px bg-slate-700 mx-0.5 shrink-0"></div>
+              
+              {/* 1. Evaluation Type (전체 검증) */}
               <select 
                 value={filterType} 
                 onChange={e => setFilterType(e.target.value)} 
-                className="dx-input w-full md:w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[8px] min-h-[36px] md:min-h-[42px] font-medium"
+                className="dx-input !w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[7px] h-[34px] sm:h-[36px] md:h-[38px] font-medium shrink-0 min-w-[95px] sm:min-w-[105px]"
               >
                 <option value="all">전체 검증</option>
                 <option value="사전기량검증">사전기량검증</option>
                 <option value="본기량검증">본기량검증</option>
               </select>
 
-              {/* 2. Multi-Select Date Filter Dropdown */}
-              <div className="relative w-full md:w-auto" ref={dateDropdownRef}>
+              {/* 2. Country Filter (전체 국가) */}
+              <select 
+                value={filterCountry} 
+                onChange={e => setFilterCountry(e.target.value)} 
+                className="dx-input !w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[7px] h-[34px] sm:h-[36px] md:h-[38px] font-medium shrink-0 min-w-[90px] sm:min-w-[100px]"
+              >
+                <option value="all">전체 국가</option>
+                {validCountries.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+
+              {/* 3. Agency Filter (전체 업체) */}
+              <select 
+                value={filterAgency} 
+                onChange={e => setFilterAgency(e.target.value)} 
+                className="dx-input !w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[7px] h-[34px] sm:h-[36px] md:h-[38px] font-medium shrink-0 min-w-[90px] sm:min-w-[100px]"
+              >
+                <option value="all">전체 업체</option>
+                {validAgencies.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+
+              {/* 4. Multi-Select Date Filter Dropdown (전체 날짜) */}
+              <div className="relative shrink-0">
                 <button
+                  ref={dateButtonRef}
                   type="button"
                   onClick={() => setIsDateOpen(prev => !prev)}
-                  className={`dx-input w-full md:w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[8px] min-h-[36px] md:min-h-[42px] flex items-center justify-between gap-2 text-left font-medium transition-all ${
+                  className={`dx-input !w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[7px] h-[34px] sm:h-[36px] md:h-[38px] flex items-center justify-between gap-1.5 text-left font-medium transition-all min-w-[115px] sm:min-w-[125px] shrink-0 ${
                     selectedDates.length > 0 
                       ? 'border-blue-500 bg-blue-950/40 text-blue-300 ring-1 ring-blue-500/50' 
                       : 'text-slate-200 hover:border-slate-500'
                   }`}
                   title="평가 일자 다중 선택"
                 >
-                  <div className="flex items-center gap-1.5 truncate max-w-[200px]">
+                  <div className="flex items-center gap-1.5 truncate max-w-[140px] sm:max-w-[170px]">
                     <Calendar className={`w-3.5 h-3.5 shrink-0 ${selectedDates.length > 0 ? 'text-blue-400' : 'text-slate-400'}`} />
                     <span className="truncate">{getDateLabel()}</span>
                   </div>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDateOpen ? 'rotate-180 text-blue-400' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${isDateOpen ? 'rotate-180 text-blue-400' : ''}`} />
                 </button>
-
-                {/* Dropdown Popover */}
-                {isDateOpen && (
-                  <div className="absolute left-0 top-full mt-1.5 z-50 w-72 md:w-80 bg-[#08172c] border border-blue-500/40 rounded-xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-700/60 mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-hd-green" />
-                        <span className="text-xs font-black text-slate-200">평가 일자 선택 (다중)</span>
-                      </div>
-                      <span className="text-[11px] font-bold text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-500/20">
-                        {selectedDates.length > 0 ? `${selectedDates.length}개 선택됨` : '전체 선택 상태'}
-                      </span>
-                    </div>
-
-                    {/* Quick Action Buttons */}
-                    <div className="flex gap-1.5 mb-2.5">
-                      <button
-                        type="button"
-                        onClick={selectAllDates}
-                        className="flex-1 py-1 px-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1"
-                      >
-                        <CheckSquare className="w-3 h-3 text-blue-400" /> 전체 선택
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearAllDates}
-                        className="flex-1 py-1 px-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1"
-                      >
-                        <Square className="w-3 h-3 text-slate-400" /> 전체 해제 (전체)
-                      </button>
-                    </div>
-
-                    {/* Date Checkbox List */}
-                    <div className="max-h-56 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                      {validDates.length === 0 ? (
-                        <p className="text-xs text-slate-500 py-3 text-center">선택 가능한 날짜가 없습니다.</p>
-                      ) : (
-                        validDates.map(dateStr => {
-                          const isChecked = selectedDates.includes(dateStr);
-                          const count = dateCounts[dateStr] || 0;
-                          return (
-                            <label
-                              key={dateStr}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleDate(dateStr);
-                              }}
-                              className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs font-semibold select-none ${
-                                isChecked 
-                                  ? 'bg-blue-900/40 border border-blue-500/40 text-slate-100' 
-                                  : 'hover:bg-slate-800/80 text-slate-300 border border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
-                                  isChecked ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-600 bg-slate-800'
-                                }`}>
-                                  {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                                </div>
-                                <span className="tracking-wide">{dateStr}</span>
-                              </div>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                isChecked ? 'bg-blue-800 text-blue-200' : 'bg-slate-800 text-slate-400'
-                              }`}>
-                                {count}명
-                              </span>
-                            </label>
-                          );
-                        })
-                      )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">
-                        {selectedDates.length === 0 ? '모든 날짜의 데이터 표시' : `선택된 ${selectedDates.length}개 일자만 표시`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsDateOpen(false)}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
-                      >
-                        적용 완료
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
-
-              {/* 3. Country Filter */}
-              <select 
-                value={filterCountry} 
-                onChange={e => setFilterCountry(e.target.value)} 
-                className="dx-input w-full md:w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[8px] min-h-[36px] md:min-h-[42px] font-medium"
-              >
-                <option value="all">전체 국가</option>
-                {validCountries.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-
-              {/* 4. Agency Filter */}
-              <select 
-                value={filterAgency} 
-                onChange={e => setFilterAgency(e.target.value)} 
-                className="dx-input w-full md:w-auto cursor-pointer text-xs md:text-sm !py-1 md:!py-[8px] min-h-[36px] md:min-h-[42px] font-medium"
-              >
-                <option value="all">전체 업체</option>
-                {validAgencies.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
 
               {/* Reset filter button if any active */}
               {(filterType !== 'all' || selectedDates.length > 0 || filterCountry !== 'all' || filterAgency !== 'all' || activeSubFilter) && (
@@ -417,22 +364,122 @@ export default function Dashboard() {
                     setFilterAgency('all');
                     setActiveSubFilter(null);
                   }}
-                  className="text-xs font-bold text-slate-400 hover:text-slate-200 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-1"
+                  className="text-xs font-bold text-slate-400 hover:text-slate-200 px-2 py-1 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap"
                   title="모든 필터 초기화"
                 >
                   <X className="w-3.5 h-3.5" /> 필터 초기화
                 </button>
               )}
             </div>
-          </div>
 
-          <button 
-            onClick={exportToCSV} 
-            className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-5 py-1.5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 md:gap-2 border border-slate-600 shrink-0 w-full xl:w-auto justify-center"
-          >
-            <Download className="w-4 h-4" /> 엑셀 다운로드
-          </button>
+            {/* Excel Download Button placed directly to the right in the same line */}
+            <button 
+              onClick={exportToCSV} 
+              className="bg-slate-700 hover:bg-slate-600 text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 border border-slate-600 shrink-0 justify-center whitespace-nowrap ml-auto"
+              title="필터링된 평가 결과 CSV 파일 다운로드"
+            >
+              <Download className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>엑셀 다운로드</span>
+            </button>
+          </div>
         </div>
+
+        {/* Date Dropdown Popover using createPortal to prevent clipping on all screens */}
+        {isDateOpen && typeof document !== 'undefined' && createPortal(
+          <div 
+            ref={dateDropdownRef}
+            style={{
+              position: 'fixed',
+              top: `${dropdownPos.top}px`,
+              left: `${dropdownPos.left}px`,
+              zIndex: 99999
+            }}
+            className="w-72 sm:w-80 bg-[#08172c] border border-blue-500/50 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-3 animate-in fade-in slide-in-from-top-2"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-700/60 mb-2">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-hd-green" />
+                <span className="text-xs font-black text-slate-200">평가 일자 선택 (다중)</span>
+              </div>
+              <span className="text-[11px] font-bold text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-500/20">
+                {selectedDates.length > 0 ? `${selectedDates.length}개 선택됨` : '전체 선택 상태'}
+              </span>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex gap-1.5 mb-2.5">
+              <button
+                type="button"
+                onClick={selectAllDates}
+                className="flex-1 py-1 px-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1"
+              >
+                <CheckSquare className="w-3 h-3 text-blue-400" /> 전체 선택
+              </button>
+              <button
+                type="button"
+                onClick={clearAllDates}
+                className="flex-1 py-1 px-2 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors flex items-center justify-center gap-1"
+              >
+                <Square className="w-3 h-3 text-slate-400" /> 전체 해제 (전체)
+              </button>
+            </div>
+
+            {/* Date Checkbox List */}
+            <div className="max-h-56 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+              {validDates.length === 0 ? (
+                <p className="text-xs text-slate-500 py-3 text-center">선택 가능한 날짜가 없습니다.</p>
+              ) : (
+                validDates.map(dateStr => {
+                  const isChecked = selectedDates.includes(dateStr);
+                  const count = dateCounts[dateStr] || 0;
+                  return (
+                    <label
+                      key={dateStr}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDate(dateStr);
+                      }}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs font-semibold select-none ${
+                        isChecked 
+                          ? 'bg-blue-900/40 border border-blue-500/40 text-slate-100' 
+                          : 'hover:bg-slate-800/80 text-slate-300 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
+                          isChecked ? 'bg-blue-600 border-blue-500 text-white' : 'border-slate-600 bg-slate-800'
+                        }`}>
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <span className="tracking-wide">{dateStr}</span>
+                      </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                        isChecked ? 'bg-blue-800 text-blue-200' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {count}명
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex items-center justify-between">
+              <span className="text-[10px] text-slate-400">
+                {selectedDates.length === 0 ? '모든 날짜의 데이터 표시' : `선택된 ${selectedDates.length}개 일자만 표시`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsDateOpen(false)}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
+              >
+                적용 완료
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">

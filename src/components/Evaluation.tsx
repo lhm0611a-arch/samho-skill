@@ -28,6 +28,8 @@ import {
   SCORES_10,
   SCORES_20,
   SCORE_LABELS,
+  QuestionItem,
+  generateCandidateQuestions,
 } from "../data";
 import {
   getKoreanGrade,
@@ -68,27 +70,17 @@ export default function Evaluation() {
   const selectedUid = selectedCandidateUid;
   const setSelectedUid = setSelectedCandidateUid;
 
-  const [qSets, setQSets] = useState<number[]>([]);
-  const [qPage, setQPage] = useState(0);
-  const [activeQuestions, setActiveQuestions] =
-    useState<string[][]>(QUESTIONS_DB);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("hd_custom_questions");
-      if (stored) {
-        const customList: string[] = JSON.parse(stored);
-        if (customList.length > 0) {
-          // split custom questions into sets of 10
-          const newSets: string[][] = [];
-          for (let i = 0; i < customList.length; i += 10) {
-            newSets.push(customList.slice(i, i + 10));
-          }
-          setActiveQuestions([...QUESTIONS_DB, ...newSets]);
-        }
-      }
-    } catch (e) {}
-  }, []);
+  const [questionLevel, setQuestionLevel] = useState<"basic" | "intermediate" | "advanced">("basic");
+  const [candidateQuestions, setCandidateQuestions] = useState<{
+    basic: QuestionItem[];
+    intermediate: QuestionItem[];
+    advanced: QuestionItem[];
+  }>({
+    basic: [],
+    intermediate: [],
+    advanced: [],
+  });
+  const [shuffleSeeds, setShuffleSeeds] = useState<Record<string, number>>({});
 
   const [kVals, setKVals] = useState<number[]>([2, 2, 2, 2, 2, 2]);
   const [sWeld, setSWeld] = useState<string>("");
@@ -507,27 +499,37 @@ export default function Evaluation() {
     setSWeld(p.s_score_weld ? String(p.s_score_weld) : "");
     setSFit(p.s_score_fit ? String(p.s_score_fit) : "");
     setSMemo(p.memo || "");
-    manualShuffle(p.name);
+
+    // Generate candidate questions (초급 10 / 중급 10 / 고급 10)
+    const generated = generateCandidateQuestions({
+      app_no: p.app_no,
+      name: p.name,
+      e9: p.e9,
+    });
+    setCandidateQuestions(generated);
   };
 
-  const manualShuffle = (seedName?: string) => {
-    const name = seedName || currentCandidate?.name || "";
-    if (!name) return;
-    let seed = 0;
-    for (let i = 0; i < name.length; i++) seed += name.charCodeAt(i);
-    const newSets: number[] = [];
-    let indices = Array.from({ length: activeQuestions.length }, (_, i) => i);
-    for (let i = 0; i < 3; i++) {
-      let idx = (seed + i * 7) % indices.length;
-      if (seedName === undefined)
-        idx = Math.floor(Math.random() * indices.length);
-      newSets.push(indices[idx]);
-      if (indices.length > 1) {
-        indices.splice(idx, 1);
-      }
+  // Re-generate questions when candidate or shuffle seed changes
+  useEffect(() => {
+    if (currentCandidate) {
+      const generated = generateCandidateQuestions({
+        app_no: currentCandidate.app_no,
+        name: currentCandidate.name + (shuffleSeeds[currentCandidate.uid] ? `_${shuffleSeeds[currentCandidate.uid]}` : ""),
+        e9: currentCandidate.e9,
+      });
+      setCandidateQuestions(generated);
     }
-    setQSets(newSets);
-    setQPage(0);
+  }, [currentCandidate, shuffleSeeds]);
+
+  const manualShuffle = () => {
+    if (!currentCandidate) return;
+    const currentSeed = shuffleSeeds[currentCandidate.uid] || 0;
+    const newSeed = currentSeed + Math.floor(Math.random() * 1000) + 1;
+    setShuffleSeeds((prev) => ({
+      ...prev,
+      [currentCandidate.uid]: newSeed,
+    }));
+    showToast("인터뷰 문항(초급/중급/고급)이 새롭게 재배정되었습니다.", "info");
   };
 
   const [playingTTS, setPlayingTTS] = useState<string | null>(null);
@@ -1072,8 +1074,9 @@ export default function Evaluation() {
       )}
       <div className="bg-[#051326] border-b border-[#1e3a5f] px-3 md:px-5 py-2.5 flex flex-col gap-2.5 shrink-0 z-30 relative shadow-sm">
         {/* Row 1: Filter Bar & Candidate Selector */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 w-full">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3 w-full">
+          {/* Left Filters Group */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <select
               value={filterType}
               onChange={(e) => {
@@ -1082,7 +1085,7 @@ export default function Evaluation() {
                 const matches = evalPoolCandidates.filter(
                   (c) =>
                     (val === "all" || c.eval_type === val) &&
-                    (filterDate === "all" || c.eval_date === filterDate) &&
+                    (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                     (filterCountry === "all" || c.country === filterCountry) &&
                     (filterAgency === "all" || c.agency === filterAgency),
                 );
@@ -1090,7 +1093,7 @@ export default function Evaluation() {
                   setSelectedUid(matches[0].uid);
                 }
               }}
-              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
+              className="bg-[#08172c] border border-[#1e3a5f] hover:border-blue-500/50 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-200 cursor-pointer outline-none transition-colors h-8 shrink-0"
             >
               <option value="all">
                 검증 {validTypes.length > 0 ? `(${validTypes.length})` : "전체"}
@@ -1105,6 +1108,7 @@ export default function Evaluation() {
                 </option>
               ))}
             </select>
+
             <select
               value={filterDate}
               onChange={(e) => {
@@ -1113,7 +1117,7 @@ export default function Evaluation() {
                 const matches = evalPoolCandidates.filter(
                   (c) =>
                     (filterType === "all" || c.eval_type === filterType) &&
-                    (val === "all" || c.eval_date === val) &&
+                    (val === "all" || getCandidateDate(c) === val) &&
                     (filterCountry === "all" || c.country === filterCountry) &&
                     (filterAgency === "all" || c.agency === filterAgency),
                 );
@@ -1121,7 +1125,7 @@ export default function Evaluation() {
                   setSelectedUid(matches[0].uid);
                 }
               }}
-              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[110px] bg-[#08172c] border-[#1e3a5f]"
+              className="bg-[#08172c] border border-[#1e3a5f] hover:border-blue-500/50 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-200 cursor-pointer outline-none transition-colors h-8 shrink-0"
             >
               <option value="all">
                 날짜 {validDates.length > 0 ? `(${validDates.length})` : "전체"}
@@ -1132,6 +1136,7 @@ export default function Evaluation() {
                 </option>
               ))}
             </select>
+
             <select
               value={filterCountry}
               onChange={(e) => {
@@ -1140,7 +1145,7 @@ export default function Evaluation() {
                 const matches = evalPoolCandidates.filter(
                   (c) =>
                     (filterType === "all" || c.eval_type === filterType) &&
-                    (filterDate === "all" || c.eval_date === filterDate) &&
+                    (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                     (val === "all" || c.country === val) &&
                     (filterAgency === "all" || c.agency === filterAgency),
                 );
@@ -1148,7 +1153,7 @@ export default function Evaluation() {
                   setSelectedUid(matches[0].uid);
                 }
               }}
-              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
+              className="bg-[#08172c] border border-[#1e3a5f] hover:border-blue-500/50 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-200 cursor-pointer outline-none transition-colors h-8 shrink-0"
             >
               <option value="all">
                 국가 {validCountries.length > 0 ? `(${validCountries.length})` : "전체"}
@@ -1159,6 +1164,7 @@ export default function Evaluation() {
                 </option>
               ))}
             </select>
+
             <select
               value={filterAgency}
               onChange={(e) => {
@@ -1167,7 +1173,7 @@ export default function Evaluation() {
                 const matches = evalPoolCandidates.filter(
                   (c) =>
                     (filterType === "all" || c.eval_type === filterType) &&
-                    (filterDate === "all" || c.eval_date === filterDate) &&
+                    (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                     (filterCountry === "all" || c.country === filterCountry) &&
                     (val === "all" || c.agency === val),
                 );
@@ -1175,7 +1181,7 @@ export default function Evaluation() {
                   setSelectedUid(matches[0].uid);
                 }
               }}
-              className="dx-input !py-1.5 !text-xs font-bold cursor-pointer w-auto min-w-[100px] bg-[#08172c] border-[#1e3a5f]"
+              className="bg-[#08172c] border border-[#1e3a5f] hover:border-blue-500/50 focus:border-blue-400 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-200 cursor-pointer outline-none transition-colors h-8 shrink-0"
             >
               <option value="all">
                 업체 {validAgencies.length > 0 ? `(${validAgencies.length})` : "전체"}
@@ -1187,7 +1193,7 @@ export default function Evaluation() {
               ))}
             </select>
 
-            <label className="flex items-center gap-1.5 text-xs text-slate-300 font-bold cursor-pointer bg-[#08172c] px-2.5 py-1.5 rounded-lg border border-[#1e3a5f] hover:border-blue-500/50 transition-all select-none shrink-0 h-[32px]">
+            <label className="flex items-center gap-1.5 text-xs text-slate-300 font-bold cursor-pointer bg-[#08172c] px-2.5 py-1 rounded-lg border border-[#1e3a5f] hover:border-blue-500/50 transition-all select-none shrink-0 h-8">
               <input
                 type="checkbox"
                 checked={showCompleted}
@@ -1198,7 +1204,7 @@ export default function Evaluation() {
                   const matches = newPool.filter(
                     (c) =>
                       (filterType === "all" || c.eval_type === filterType) &&
-                      (filterDate === "all" || c.eval_date === filterDate) &&
+                      (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                       (filterCountry === "all" || c.country === filterCountry) &&
                       (filterAgency === "all" || c.agency === filterAgency),
                   );
@@ -1208,12 +1214,12 @@ export default function Evaluation() {
                 }}
                 className="rounded bg-[#051326] border-[#1e3a5f] text-blue-500 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
               />
-              <span>완료자 포함</span>
+              <span className="whitespace-nowrap">완료자 포함</span>
             </label>
           </div>
 
-          {/* Candidate Select Dropdown */}
-          <div className="relative w-full lg:w-96 shrink-0">
+          {/* Right: Candidate Select Dropdown */}
+          <div className="relative w-full sm:w-80 md:w-88 lg:w-96 shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <UserSearch className="text-blue-400 w-4 h-4" />
             </div>
@@ -1221,7 +1227,7 @@ export default function Evaluation() {
               value={selectedUid || ""}
               onChange={(e) => setSelectedUid(e.target.value)}
               disabled={filteredCandidates.length === 0}
-              className="dx-input w-full pl-9 pr-8 !py-1.5 font-black text-xs md:text-sm text-blue-200 cursor-pointer appearance-none bg-[#08172c] border-[#3b82f6]/60 focus:border-blue-400 shadow-sm"
+              className="w-full bg-[#08172c] border border-blue-500/50 hover:border-blue-400 focus:border-blue-400 rounded-lg pl-9 pr-8 py-1 text-xs sm:text-sm font-black text-blue-200 cursor-pointer appearance-none shadow-sm h-8 sm:h-8.5 outline-none transition-colors"
             >
               {filteredCandidates.length === 0 && (
                 <option value="">
@@ -1365,84 +1371,180 @@ export default function Evaluation() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col md:flex-row gap-3 md:gap-4 p-3 md:p-4 max-w-[1800px] mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row gap-2.5 md:gap-3.5 p-2 sm:p-3 md:p-4 max-w-[1800px] mx-auto w-full">
         <div
-          className={`dx-card ${userRole === "interviewer" ? "w-full" : "w-full md:w-5/12"} flex-[1] md:flex-none flex flex-col relative min-h-0 overflow-hidden bg-[#08172c]`}
+          className={`dx-card ${userRole === "interviewer" ? "w-full" : "w-full md:w-5/12"} h-[300px] sm:h-[350px] md:h-full flex-none md:flex-1 flex flex-col relative min-h-0 overflow-hidden bg-[#08172c]`}
         >
-          <div className="px-2.5 py-2 md:px-3.5 md:py-2.5 border-b border-[#1e3a5f] bg-[#051326] flex flex-nowrap justify-between items-center gap-1.5 md:gap-2 sticky top-0 z-10 w-full overflow-hidden">
-            <div className="flex items-center gap-1.5 md:gap-2 min-w-0 shrink">
-              <span className="font-black text-slate-100 text-xs md:text-sm flex items-center gap-1.5 shrink-0" style={{ textAlign: 'left' }}>
-                <FileQuestion className="text-blue-400 w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline whitespace-nowrap">인터뷰 문항</span>
-              </span>
-              <select
-                value={selectedVoice}
-                onChange={(e) => {
-                  const v = e.target.value as TTSVoiceType;
-                  setSelectedVoice(v);
-                  setTTSVoice(v);
-                }}
-                className="bg-[#0a1b35] text-[11px] md:text-xs font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-2 py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors shrink min-w-0 truncate max-w-[140px] sm:max-w-[170px] xl:max-w-[200px]"
-                title="AI 면접관 음성 선택"
-              >
-                <option value="Fenrir">👨 남성 1 (차분·또렷)</option>
-                <option value="Charon">👨 남성 2 (신뢰감)</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
-              <button
-                onClick={() => manualShuffle()}
-                className="bg-[#0a1b35] border border-[#1e3a5f] hover:bg-[#1e3a5f] text-slate-300 px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm shrink-0"
-                title="문항 무작위 셔플"
-              >
-                <Shuffle className="w-3.5 h-3.5 text-blue-400" />
-                <span className="hidden 2xl:inline whitespace-nowrap">셔플</span>
-              </button>
-              <div className="flex items-center bg-[#0a1b35] px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg border border-[#1e3a5f] shadow-sm shrink-0">
-                <span className="text-[11px] md:text-xs font-bold text-slate-300 whitespace-nowrap tracking-tight">
-                  {qPage + 1}/3
-                  <span className="text-slate-400 font-normal ml-0.5 text-[10px] md:text-[11px]">(SET {(qSets[qPage] || 0) + 1})</span>
+          {/* Header Row: Title, Level Tabs (초급, 중급, 고급), Voice & Shuffle */}
+          <div className="px-2.5 py-1.5 sm:px-3 sm:py-2 border-b border-[#1e3a5f] bg-[#051326] flex flex-col gap-1.5 sticky top-0 z-10 w-full shrink-0">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <FileQuestion className="text-blue-400 w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="font-black text-slate-100 text-xs sm:text-sm whitespace-nowrap">
+                  인터뷰 문항
                 </span>
-                <button
-                  onClick={() => setQPage((prev) => (prev + 1) % 3)}
-                  className="hover:bg-[#1e3a5f] text-slate-400 hover:text-slate-200 w-5 h-5 md:w-6 md:h-6 rounded flex items-center justify-center transition-colors ml-0.5"
-                  title="다음 문항 세트 (1~3)"
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 bg-[#0a1b35] px-1.5 py-0.5 rounded border border-[#1e3a5f] whitespace-nowrap shrink-0 hidden sm:inline-block">
+                  30문항 풀
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                <select
+                  value={selectedVoice}
+                  onChange={(e) => {
+                    const v = e.target.value as TTSVoiceType;
+                    setSelectedVoice(v);
+                    setTTSVoice(v);
+                  }}
+                  className="bg-[#0a1b35] text-[10px] sm:text-[11px] font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-1.5 py-0.5 sm:py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors shrink min-w-0 truncate max-w-[90px] sm:max-w-[110px] h-7"
+                  title="AI 면접관 음성 선택"
                 >
-                  <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  <option value="Fenrir">👨 남성 1 (차분)</option>
+                  <option value="Charon">👨 남성 2 (신뢰)</option>
+                </select>
+
+                <button
+                  onClick={() => manualShuffle()}
+                  className="bg-[#0a1b35] border border-[#1e3a5f] hover:bg-[#1e3a5f] text-slate-300 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm shrink-0 whitespace-nowrap h-7"
+                  title="해당 인원 문항 랜덤 재배정"
+                >
+                  <Shuffle className="w-3 h-3 text-blue-400 shrink-0" />
+                  <span className="hidden xs:inline sm:inline whitespace-nowrap">재배정</span>
                 </button>
               </div>
             </div>
+
+            {/* Level Selector Tabs: 초급 (10문항) / 중급 (10문항) / 고급 (10문항) */}
+            <div className="grid grid-cols-3 gap-1 bg-[#030f1c] p-0.5 sm:p-1 rounded-lg border border-[#1e3a5f]/80">
+              <button
+                type="button"
+                onClick={() => setQuestionLevel("basic")}
+                className={`py-1 px-1 rounded-md font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
+                  questionLevel === "basic"
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-950 font-black"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
+                }`}
+              >
+                <span>초급<span className="hidden lg:inline font-normal text-[10px] text-emerald-200 ml-0.5">(기초)</span></span>
+                <span
+                  className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
+                    questionLevel === "basic" ? "bg-emerald-800 text-emerald-100 font-black" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  10
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuestionLevel("intermediate")}
+                className={`py-1 px-1 rounded-md font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
+                  questionLevel === "intermediate"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-950 font-black"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
+                }`}
+              >
+                <span>중급<span className="hidden lg:inline font-normal text-[10px] text-blue-200 ml-0.5">(직무)</span></span>
+                <span
+                  className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
+                    questionLevel === "intermediate" ? "bg-blue-800 text-blue-100 font-black" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  10
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuestionLevel("advanced")}
+                className={`py-1 px-1 rounded-md font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
+                  questionLevel === "advanced"
+                    ? "bg-purple-600 text-white shadow-md shadow-purple-950 font-black"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
+                }`}
+              >
+                <span>고급<span className="hidden lg:inline font-normal text-[10px] text-purple-200 ml-0.5">(심층)</span></span>
+                <span
+                  className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
+                    questionLevel === "advanced" ? "bg-purple-800 text-purple-100 font-black" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  10
+                </span>
+              </button>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-[#030f1c] space-y-2">
-            {qSets[qPage] !== undefined &&
-              activeQuestions[qSets[qPage]]?.map((qStr, idx) => {
-                const parts = qStr.split("→");
-                const q = parts[0] || "";
-                const tail = parts[1] || "";
-                const isNew = q.includes("[신규]");
-                const cleanQ = q.replace("[신규]", "").trim();
-                const cleanTail = tail.replace("[신규]", "").trim();
+
+          {/* Question List View */}
+          <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 md:p-4 bg-[#030f1c] space-y-2 sm:space-y-2.5">
+            {(() => {
+              const list: QuestionItem[] = candidateQuestions[questionLevel] || [];
+              if (list.length === 0) {
+                return (
+                  <div className="p-8 text-center text-slate-400 text-xs">
+                    응시자를 선택하면 맞춤 30문항(초급 10 / 중급 10 / 고급 10)이 자동 배정됩니다.
+                  </div>
+                );
+              }
+
+              return list.map((item, idx) => {
+                const isE9Special = !!item.isE9Special;
+                const cleanQ = item.q;
+                const cleanTail = item.tail || "";
+
                 return (
                   <div
-                    key={idx}
-                    className="p-2.5 rounded-xl bg-[#08172c] border border-[#1e3a5f] hover:border-blue-500/50 hover:shadow-lg transition-all relative overflow-hidden group"
+                    key={`${questionLevel}_${idx}`}
+                    className={`p-2.5 rounded-xl border transition-all relative overflow-hidden group ${
+                      isE9Special
+                        ? "bg-[#0b1d3a] border-amber-500/60 shadow-sm"
+                        : "bg-[#08172c] border-[#1e3a5f] hover:border-blue-500/50 hover:shadow-lg"
+                    }`}
                   >
-                    <div className="absolute left-0 top-0 bottom-0 w-1 md:w-1.5 bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
+                    {/* Left Accent Bar */}
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-1.5 transition-colors ${
+                        isE9Special
+                          ? "bg-amber-400"
+                          : questionLevel === "basic"
+                          ? "bg-emerald-500"
+                          : questionLevel === "intermediate"
+                          ? "bg-blue-500"
+                          : "bg-purple-500"
+                      }`}
+                    ></div>
+
                     <div className="flex flex-col gap-1.5 w-full pl-2">
                       <div className="flex justify-between items-start gap-2">
                         <div className="font-bold text-slate-100 text-[13px] md:text-sm leading-snug flex items-start text-left flex-1">
-                          <span className="text-blue-400 mr-1.5 md:mr-2 text-sm md:text-base font-black shrink-0">
+                          <span
+                            className={`mr-1.5 text-sm md:text-base font-black shrink-0 ${
+                              isE9Special
+                                ? "text-amber-400"
+                                : questionLevel === "basic"
+                                ? "text-emerald-400"
+                                : questionLevel === "intermediate"
+                                ? "text-blue-400"
+                                : "text-purple-400"
+                            }`}
+                          >
                             Q{idx + 1}.
                           </span>
                           <span className="break-keep flex-1">
                             {cleanQ}
-                            {isNew && (
-                              <span className="font-black ml-2 text-[9px] bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded-full border border-red-500/30 align-middle inline-block">
-                                NEW
+                            {isE9Special && (
+                              <span className="font-black ml-2 text-[10px] bg-amber-950/80 text-amber-300 px-2 py-0.5 rounded border border-amber-500/60 align-middle inline-block">
+                                📋 E-9 근무이력 정보취득
+                              </span>
+                            )}
+                            {item.category && !isE9Special && (
+                              <span className="font-bold ml-1.5 text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 align-middle inline-block">
+                                {item.category}
                               </span>
                             )}
                           </span>
                         </div>
+
                         <button
                           onClick={() => handlePlayTTS(cleanQ)}
                           disabled={playingTTS === cleanQ}
@@ -1484,56 +1586,56 @@ export default function Evaluation() {
                     </div>
                   </div>
                 );
-              })}
+              });
+            })()}
           </div>
         </div>
 
-        <div className="dx-card w-full md:w-7/12 flex-[2] md:flex-none flex flex-col relative min-h-0 overflow-hidden bg-[#08172c]">
-          <div className="flex border-b border-[#1e3a5f] bg-[#051326] p-2 md:p-3 gap-2 md:gap-3">
+        <div className="dx-card w-full md:w-7/12 flex-1 md:flex-[1.4] flex flex-col relative min-h-0 overflow-hidden bg-[#08172c]">
+          <div className="flex border-b border-[#1e3a5f] bg-[#051326] p-1.5 sm:p-2 gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setCurrentTab("korean")}
-              className={`flex-1 h-[45px] rounded-xl text-sm md:text-base font-black transition-all flex items-center justify-center gap-2 ${currentTab === "korean" ? "text-white bg-blue-600 shadow-md border border-blue-500" : "text-slate-400 bg-transparent hover:bg-slate-800 border border-transparent"}`}
+              className={`flex-1 h-8 sm:h-9 rounded-lg text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 ${currentTab === "korean" ? "text-white bg-blue-600 shadow-md border border-blue-500" : "text-slate-400 bg-transparent hover:bg-slate-800 border border-transparent"}`}
             >
-              <Languages className="w-4 h-4 md:w-5 md:h-5" /> 한국어 평가
+              <Languages className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> 한국어 평가
             </button>
             <button
               onClick={() => setCurrentTab("skill")}
-              className={`flex-1 h-[45px] rounded-xl text-sm md:text-base font-black transition-all flex items-center justify-center gap-2 ${currentTab === "skill" ? "text-white bg-hd-green shadow-md border border-green-500" : "text-slate-400 bg-transparent hover:bg-slate-800 border border-transparent"}`}
+              className={`flex-1 h-8 sm:h-9 rounded-lg text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 ${currentTab === "skill" ? "text-white bg-hd-green shadow-md border border-green-500" : "text-slate-400 bg-transparent hover:bg-slate-800 border border-transparent"}`}
             >
-              <HardHat className="w-4 h-4 md:w-5 md:h-5" /> 기량 검증
+              <HardHat className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> 기량 검증
             </button>
           </div>
 
-          <div className="px-3 sm:px-4 md:px-5 py-2 sm:py-[10px] min-h-[63px] flex flex-wrap gap-2 justify-between items-center border-b border-[#1e3a5f] bg-[#0a1b35] z-20 shrink-0">
-            <div className="flex flex-wrap items-center gap-2 md:gap-5">
-              <div className="flex items-center gap-2 md:gap-4">
-                <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:inline">
-                  Total Score
+          <div className="px-2.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 border-b border-[#1e3a5f] bg-[#0a1b35] z-20 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider hidden xs:inline">
+                Score
+              </span>
+              <div className="bg-[#051326] px-2 sm:px-3 py-0.5 rounded-lg border border-[#1e3a5f] flex items-baseline gap-1 shadow-inner h-8 flex-nowrap items-center">
+                <span className="text-base sm:text-lg md:text-xl font-black text-blue-400 leading-none">
+                  {currentTab === "korean" ? calcKoreanTotal() : (sWeld || "0")}
                 </span>
-                <div className="bg-[#051326] px-3 md:px-5 py-1 sm:py-0 sm:h-[50px] sm:pt-[4px] rounded-xl border border-[#1e3a5f] flex items-baseline gap-1 md:gap-1.5 shadow-inner">
-                  <span className="text-xl sm:text-[25px] sm:h-[33px] font-black text-blue-400">
-                    {currentTab === "korean" ? calcKoreanTotal() : (sWeld || "0")}
-                  </span>
-                  <span className="text-xs sm:text-sm md:text-base font-bold text-slate-500">
-                    /100
-                  </span>
-                </div>
+                <span className="text-[10px] sm:text-xs font-bold text-slate-500">
+                  /100
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={handleReset}
-                className="bg-red-500/15 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 px-3 md:px-4 py-2 sm:h-[41px] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-1.5"
+                className="bg-red-500/15 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 px-2 sm:px-2.5 h-8 rounded-lg text-[11px] sm:text-xs font-bold transition-all shadow-sm flex items-center gap-1 shrink-0"
                 title="기존 입력된 점수를 모두 지우고 '대기' 상태로 초기화"
               >
-                <RotateCcw className="w-4 h-4" /> <span>점수 초기화</span>
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">초기화</span>
               </button>
               <button
                 type="button"
                 onClick={handleSave}
-                className={`px-3 sm:px-4 md:px-6 py-2 sm:py-0 sm:h-[41px] rounded-xl font-black tracking-wide transition-all shadow-lg flex items-center gap-1.5 md:gap-2 text-xs sm:text-sm md:text-base text-white ${
+                className={`px-2.5 sm:px-4 h-8 rounded-lg font-black tracking-wide transition-all shadow-md flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-white shrink-0 ${
                   savedSuccess
                     ? "bg-emerald-600 border border-emerald-300 shadow-emerald-900/50"
                     : isCandidateEvaluated
@@ -1544,13 +1646,13 @@ export default function Evaluation() {
               >
                 {savedSuccess ? (
                   <>
-                    <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-white animate-pulse" />
-                    <span>저장 완료!</span>
+                    <UserCheck className="w-3.5 h-3.5 text-white animate-pulse shrink-0" />
+                    <span className="whitespace-nowrap">저장 완료!</span>
                   </>
                 ) : (
                   <>
-                    <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
-                    <span>{isCandidateEvaluated ? "수정 저장" : "평가 저장"}</span>
+                    <Save className="w-3.5 h-3.5 shrink-0" />
+                    <span className="whitespace-nowrap">{isCandidateEvaluated ? "수정 저장" : "평가 저장"}</span>
                   </>
                 )}
               </button>
@@ -1559,7 +1661,7 @@ export default function Evaluation() {
 
             <div className="flex-1 overflow-y-auto bg-[#030f1c] relative">
               {currentTab === "korean" ? (
-                <div className="p-3 md:p-5 pb-20 md:pb-24 grid grid-cols-1 gap-3 md:gap-4">
+                <div className="p-2.5 sm:p-3 md:p-4 pb-16 md:pb-20 grid grid-cols-1 gap-2.5 sm:gap-3">
                   {[
                     {
                       id: 1,
@@ -1602,18 +1704,18 @@ export default function Evaluation() {
                     return (
                       <div
                         key={item.id}
-                        className="bg-[#08172c] border border-[#1e3a5f] p-3 md:p-4 rounded-xl shadow-sm transition-all hover:border-blue-500/30 flex flex-col justify-between h-auto min-h-[156px] gap-3"
+                        className="bg-[#08172c] border border-[#1e3a5f] p-2.5 sm:p-3.5 rounded-xl shadow-sm transition-all hover:border-blue-500/30 flex flex-col justify-between h-auto min-h-[136px] sm:min-h-[144px] gap-2 sm:gap-2.5"
                       >
                         <div className="flex justify-between items-center">
-                          <span className="font-black text-sm md:text-base text-slate-100 tracking-tight flex items-center gap-2">
-                            <Icon className="text-blue-400 w-4 h-4 md:w-5 md:h-5" />{" "}
+                          <span className="font-black text-xs sm:text-sm md:text-base text-slate-100 tracking-tight flex items-center gap-1.5 sm:gap-2">
+                            <Icon className="text-blue-400 w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />{" "}
                             {item.title}
                           </span>
-                          <span className="text-[10px] md:text-xs bg-slate-800 text-slate-400 font-bold px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-slate-700 tracking-wider shrink-0">
+                          <span className="text-[9px] sm:text-[10px] md:text-xs bg-slate-800 text-slate-400 font-bold px-1.5 sm:px-2 md:px-3 py-0.5 sm:py-1 rounded-lg border border-slate-700 tracking-wider shrink-0">
                             MAX {item.max}
                           </span>
                         </div>
-                        <div className="flex justify-between gap-1.5 md:gap-3">
+                        <div className="flex justify-between gap-1 sm:gap-1.5 md:gap-2">
                           {SCORE_LABELS.map((label, i) => {
                             const score =
                               item.max === 10 ? SCORES_10[i] : SCORES_20[i];
@@ -1626,12 +1728,12 @@ export default function Evaluation() {
                                   newVals[index] = i;
                                   setKVals(newVals);
                                 }}
-                                className={`score-btn flex-1 py-2 flex flex-col items-center justify-center rounded-lg ${isActive ? `active-${i}` : ""}`}
+                                className={`score-btn flex-1 py-1 sm:py-1.5 flex flex-col items-center justify-center rounded-lg ${isActive ? `active-${i}` : ""}`}
                               >
-                                <span className="text-[10px] md:text-xs opacity-90 tracking-tight mb-1">
+                                <span className="text-[9px] sm:text-[10px] md:text-xs opacity-90 tracking-tight mb-0.5">
                                   {label}
                                 </span>
-                                <span className="text-base md:text-lg font-black leading-none">
+                                <span className="text-sm sm:text-base md:text-lg font-black leading-none">
                                   {score}
                                 </span>
                               </button>

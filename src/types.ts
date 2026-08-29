@@ -35,7 +35,8 @@ export interface Log {
   app_no: string;
   evaluator: string;
   score: number;
-  timestamp: string;
+  timestamp?: string;
+  eval_date?: string;
   details: string;
   name: string;
   eval_type: string;

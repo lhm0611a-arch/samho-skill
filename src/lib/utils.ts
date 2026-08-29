@@ -291,8 +291,84 @@ export function normalizeE9(raw: any): string {
   return 'X';
 }
 
+export function normalizeDate(raw: any): string {
+  if (raw === undefined || raw === null) return '';
+  
+  // 1. 숫자형 또는 5자리 숫자 (엑셀 시리얼 날짜: 25000~65000)
+  const numVal = typeof raw === 'number' ? raw : (typeof raw === 'string' && /^\d{5}$/.test(raw.trim()) ? Number(raw.trim()) : null);
+  if (numVal !== null && numVal >= 25000 && numVal <= 65000) {
+    const date = new Date(Math.round((numVal - 25569) * 86400 * 1000));
+    if (!isNaN(date.getTime())) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(date.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  let s = String(raw).trim().replace(/\s+/g, '');
+  if (!s) return '';
+
+  // 2. 4자리 연도로 시작: YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD
+  const matchYMD = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (matchYMD) {
+    const y = parseInt(matchYMD[1], 10);
+    const m = parseInt(matchYMD[2], 10);
+    const d = parseInt(matchYMD[3], 10);
+    if (y >= 1970 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 3. 4자리 연도로 끝 (유럽/동남아식 DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY)
+  const matchDMY = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+  if (matchDMY) {
+    const d = parseInt(matchDMY[1], 10);
+    const m = parseInt(matchDMY[2], 10);
+    const y = parseInt(matchDMY[3], 10);
+    if (y >= 1970 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 4. 8자리 연속 숫자 (YYYYMMDD)
+  if (/^\d{8}$/.test(s)) {
+    const y = parseInt(s.substring(0, 4), 10);
+    const m = parseInt(s.substring(4, 6), 10);
+    const d = parseInt(s.substring(6, 8), 10);
+    if (y >= 1970 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 5. 2자리 연도로 시작: YY-MM-DD, YY.MM.DD, YY/MM/DD (20YY년)
+  const matchYYMD = s.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (matchYYMD) {
+    const yy = parseInt(matchYYMD[1], 10);
+    const m = parseInt(matchYYMD[2], 10);
+    const d = parseInt(matchYYMD[3], 10);
+    const y = 2000 + yy;
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  // 6. 일반 JS Date 파싱 (ISO 문자열 포함)
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    if (y >= 1970 && y <= 2099) {
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  return s;
+}
+
 export function formatYYYYMMDD(str: string): string {
-  return normalizeDob(str);
+  return normalizeDate(str);
 }
 
 export function getSkillGradeByScore(val: number): string {

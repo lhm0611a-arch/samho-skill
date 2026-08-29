@@ -39,6 +39,7 @@ import {
   getBadgeHtml,
   normalizeType,
   formatYYYYMMDD,
+  normalizeDate,
   calculateAge,
   normalizeDob,
 } from "../lib/utils";
@@ -267,6 +268,23 @@ export default function Evaluation() {
     }
   }, [selectedUid, candidates]);
 
+  // Helper to reliably resolve evaluation date
+  const getCandidateDate = (c: any): string => {
+    if (c.eval_date && String(c.eval_date).trim() !== '') {
+      const n = normalizeDate(c.eval_date);
+      if (n) return n;
+    }
+    const matchLog = globalLogs.find(l => 
+      String(l.app_no).trim() === String(c.app_no).trim() && 
+      (normalizeType(l.eval_type) === normalizeType(c.eval_type) || !l.eval_type) && 
+      l.eval_date
+    );
+    if (matchLog && matchLog.eval_date) {
+      return normalizeDate(matchLog.eval_date);
+    }
+    return '';
+  };
+
   // Candidate pool based on showCompleted toggle
   const evalPoolCandidates = useMemo(() => {
     return candidates.filter((c) => {
@@ -282,7 +300,7 @@ export default function Evaluation() {
           evalPoolCandidates
             .filter(
               (c) =>
-                (filterDate === "all" || c.eval_date === filterDate) &&
+                (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                 (filterCountry === "all" || c.country === filterCountry) &&
                 (filterAgency === "all" || c.agency === filterAgency),
             )
@@ -290,7 +308,7 @@ export default function Evaluation() {
             .filter(Boolean),
         ),
       ).sort(),
-    [evalPoolCandidates, filterDate, filterCountry, filterAgency],
+    [evalPoolCandidates, filterDate, filterCountry, filterAgency, globalLogs],
   );
 
   const validDates = useMemo(
@@ -304,13 +322,13 @@ export default function Evaluation() {
                 (filterCountry === "all" || c.country === filterCountry) &&
                 (filterAgency === "all" || c.agency === filterAgency),
             )
-            .map((c) => c.eval_date)
+            .map((c) => getCandidateDate(c))
             .filter(Boolean),
         ),
       )
         .sort()
         .reverse(),
-    [evalPoolCandidates, filterType, filterCountry, filterAgency],
+    [evalPoolCandidates, filterType, filterCountry, filterAgency, globalLogs],
   );
 
   const validCountries = useMemo(
@@ -321,14 +339,14 @@ export default function Evaluation() {
             .filter(
               (c) =>
                 (filterType === "all" || c.eval_type === filterType) &&
-                (filterDate === "all" || c.eval_date === filterDate) &&
+                (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                 (filterAgency === "all" || c.agency === filterAgency),
             )
             .map((c) => c.country)
             .filter(Boolean),
         ),
       ).sort(),
-    [evalPoolCandidates, filterType, filterDate, filterAgency],
+    [evalPoolCandidates, filterType, filterDate, filterAgency, globalLogs],
   );
 
   const validAgencies = useMemo(
@@ -339,14 +357,14 @@ export default function Evaluation() {
             .filter(
               (c) =>
                 (filterType === "all" || c.eval_type === filterType) &&
-                (filterDate === "all" || c.eval_date === filterDate) &&
+                (filterDate === "all" || getCandidateDate(c) === filterDate) &&
                 (filterCountry === "all" || c.country === filterCountry),
             )
             .map((c) => c.agency)
             .filter(Boolean),
         ),
       ).sort(),
-    [evalPoolCandidates, filterType, filterDate, filterCountry],
+    [evalPoolCandidates, filterType, filterDate, filterCountry, globalLogs],
   );
 
   useEffect(() => {
@@ -377,7 +395,7 @@ export default function Evaluation() {
     return evalPoolCandidates
       .filter((c) => {
         if (filterType !== "all" && c.eval_type !== filterType) return false;
-        if (filterDate !== "all" && c.eval_date !== filterDate) return false;
+        if (filterDate !== "all" && getCandidateDate(c) !== filterDate) return false;
         if (filterCountry !== "all" && c.country !== filterCountry)
           return false;
         if (filterAgency !== "all" && c.agency !== filterAgency) return false;
@@ -394,6 +412,7 @@ export default function Evaluation() {
     filterDate,
     filterCountry,
     filterAgency,
+    globalLogs,
   ]);
 
   useEffect(() => {

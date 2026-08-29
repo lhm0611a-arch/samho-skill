@@ -15,6 +15,7 @@ import {
   calculateAge, 
   normalizeE9, 
   normalizeType, 
+  normalizeDate,
   formatYYYYMMDD 
 } from '../lib/utils';
 
@@ -155,7 +156,7 @@ export default function Admin() {
               }
 
               // 평가일자 (r[24] 또는 오늘 날짜)
-              let eval_date = r[24] ? normalizeDob(r[24]) : '';
+              let eval_date = r[24] ? normalizeDate(r[24]) : '';
 
               // 기량/한국어 점수 (종합 시트인 경우)
               let k_score = parseInt(r[13]) || 0;

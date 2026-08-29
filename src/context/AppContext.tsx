@@ -3,6 +3,7 @@ import { Candidate, Log, UserRole, ViewType } from '../types';
 import { 
   normalizeType, 
   formatYYYYMMDD, 
+  normalizeDate,
   getKoreanGrade, 
   getKoreanPassText, 
   checkKoreanPass, 
@@ -70,22 +71,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (savedAgency) setConfAgencyState(savedAgency);
 
     try {
+      const savedLogsStr = localStorage.getItem('hd_logs');
+      let loadedLogs: Log[] = [];
+      if (savedLogsStr) {
+        try {
+          loadedLogs = JSON.parse(savedLogsStr);
+          setGlobalLogs(loadedLogs);
+        } catch (e) {}
+      }
+
       const savedCandidates = localStorage.getItem('hd_candidates');
       if (savedCandidates) {
         const parsed = JSON.parse(savedCandidates);
         const seen = new Map<string, number>();
         const sanitized = parsed.map((c: any, idx: number) => {
-          const rawBase = c.uid ? c.uid.replace(/_\d+$/, '') : `${c.app_no}_${c.name}_${c.eval_date}_${c.eval_type}`;
+          let eDate = normalizeDate(c.eval_date);
+          if (!eDate && loadedLogs.length > 0) {
+            const mLog = loadedLogs.find((l: any) => String(l.app_no).trim() === String(c.app_no).trim() && (normalizeType(l.eval_type) === normalizeType(c.eval_type) || !l.eval_type) && l.eval_date);
+            if (mLog && mLog.eval_date) eDate = normalizeDate(mLog.eval_date);
+          }
+          const rawBase = c.uid ? c.uid.replace(/_\d+$/, '') : `${c.app_no}_${c.name}_${eDate}_${c.eval_type}`;
           const base = rawBase || `candidate_${idx}`;
           const count = seen.get(base) || 0;
           seen.set(base, count + 1);
           const uid = count === 0 ? base : `${base}_${count}`;
-          return { ...c, uid };
+          return { ...c, eval_date: eDate, uid };
         });
         setCandidates(sanitized);
       }
-      const savedLogs = localStorage.getItem('hd_logs');
-      if (savedLogs) setGlobalLogs(JSON.parse(savedLogs));
     } catch (e) {
       console.error("Failed to load local data", e);
     }
@@ -166,7 +179,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const mappedCandidates = uniqueCandidateList.map((d: any) => {
         const eType = normalizeType(d.eval_type);
-        const fDate = formatYYYYMMDD(d.eval_date);
+        let fDate = normalizeDate(d.eval_date);
+        if (!fDate && logs.length > 0) {
+          const mLog = logs.find((l: any) => String(l.app_no).trim() === String(d.app_no).trim() && (normalizeType(l.eval_type) === eType || !l.eval_type) && l.eval_date);
+          if (mLog && mLog.eval_date) fDate = normalizeDate(mLog.eval_date);
+        }
         const appNo = normalizeAppNo(d.app_no);
         const candName = normalizeName(d.name);
         const job = normalizeJob(d.job);

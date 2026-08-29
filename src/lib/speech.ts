@@ -1,5 +1,5 @@
 // High-Fidelity AI Voice TTS Engine (Male Interviewer Dedicated)
-// Uses High-Definition Audio TTS with persistent server disk caching and high-quality fallback.
+// Uses High-Definition Audio TTS with persistent server disk caching and male-only fallback safety.
 
 const audioCache = new Map<string, HTMLAudioElement>();
 
@@ -34,36 +34,43 @@ export function getTTSVoice(): TTSVoiceType {
   return currentVoice;
 }
 
-// Get best Korean male voice available in the browser (for offline fallback)
-function getKoreanVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+// Get best Korean MALE voice available in the browser (strictly prioritizing male voices)
+function getKoreanMaleVoice(): { voice: SpeechSynthesisVoice | null; isExplicitMale: boolean } {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return { voice: null, isExplicitMale: false };
+  }
   const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) {
+    return { voice: null, isExplicitMale: false };
+  }
   
-  // Look specifically for Male Korean voices in Windows, Mac, Android, iOS
+  // 1. Look specifically for explicit Male Korean voices in Windows, Mac, Android, Chrome, Edge, iOS
+  const maleKeywords = [
+    'male', '남성', 'injoon', 'bongjin', 'minho', 'gihun', 'hyun', 
+    'jungho', 'seung', 'young', 'dong', 'chul', 'dae', 'kyu', 'nam'
+  ];
+  
   const maleKo = voices.find(v => 
-    v.lang.startsWith('ko') && (
-      v.name.toLowerCase().includes('male') ||
-      v.name.includes('남성') ||
-      v.name.includes('InJoon') ||
-      v.name.includes('BongJin') ||
-      v.name.includes('MinHo') ||
-      v.name.includes('Gihun') ||
-      v.name.includes('Hyun')
-    )
+    v.lang.startsWith('ko') && maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
   );
-  if (maleKo) return maleKo;
+  if (maleKo) return { voice: maleKo, isExplicitMale: true };
 
-  // Fallback to any Korean voice
+  // 2. Filter out explicit female voices (Heami, Yuna, SunHi, 여성, female, Jinho female etc.)
+  const femaleKeywords = ['female', '여성', 'heami', 'yuna', 'sunhi', 'seoyeon', 'minsu_f', 'hana', 'jiyeon'];
+  const nonFemaleKo = voices.find(v => 
+    v.lang.startsWith('ko') && !femaleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+  );
+  if (nonFemaleKo) return { voice: nonFemaleKo, isExplicitMale: false };
+
+  // 3. Fallback to any Korean voice if none found
   const anyKo = voices.find(v => v.lang.startsWith('ko'));
-  if (anyKo) return anyKo;
-
-  return null;
+  return { voice: anyKo || null, isExplicitMale: false };
 }
 
 // Pre-load speech synthesis voices
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => {
-    getKoreanVoice();
+    getKoreanMaleVoice();
   };
 }
 
@@ -86,6 +93,39 @@ export function stopTTS() {
     } catch (_) {}
     currentUtterance = null;
   }
+}
+
+/**
+ * Fetch server TTS with retry logic to avoid unnecessary fallback to browser speech
+ */
+async function fetchServerTTSAudio(text: string, voice: TTSVoiceType, signal: AbortSignal, maxRetries = 2): Promise<any> {
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (signal.aborted) throw new Error('AbortError');
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice }),
+        signal
+      });
+      if (!res.ok) {
+        throw new Error(`Server TTS returned HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (data?.audioBase64) {
+        return data;
+      }
+      throw new Error('No audio data returned from server');
+    } catch (err: any) {
+      lastError = err;
+      if (err.name === 'AbortError' || signal.aborted) throw err;
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
@@ -118,7 +158,6 @@ export function speakText(
   }
 
   let cancelled = false;
-
   const cacheKey = `v3_${voiceTarget}_${cleanText}`;
 
   // 1. Check client-side audio memory cache first
@@ -135,13 +174,13 @@ export function speakText(
       if (!cancelled) callbacks?.onEnd?.();
     };
     cachedAudio.onerror = (e) => {
-      console.warn('Cached audio playback failed, falling back:', e);
+      console.warn('Cached audio playback failed, trying server refetch:', e);
       currentAudio = null;
       if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
     };
 
     cachedAudio.play().catch(e => {
-      console.warn('Cached audio play promise rejected, using fallback:', e);
+      console.warn('Cached audio play promise rejected, trying Web Speech fallback:', e);
       if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
     });
 
@@ -151,21 +190,10 @@ export function speakText(
     };
   }
 
-  // 2. Fetch from backend TTS endpoint (persisted server audio)
+  // 2. Fetch from backend TTS endpoint (persisted server audio) with retry
   const fetchController = new AbortController();
 
-  fetch('/api/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: cleanText, voice: voiceTarget }),
-    signal: fetchController.signal
-  })
-    .then(async (res) => {
-      if (!res.ok) {
-        throw new Error(`Server TTS returned HTTP ${res.status}`);
-      }
-      return res.json();
-    })
+  fetchServerTTSAudio(cleanText, voiceTarget, fetchController.signal)
     .then((data) => {
       if (cancelled) return;
 
@@ -204,7 +232,7 @@ export function speakText(
     .catch((err) => {
       if (cancelled) return;
       if (err.name !== 'AbortError') {
-        console.warn('Server TTS failed, falling back to browser speech:', err);
+        console.warn('Server TTS failed, using low-pitch male browser speech fallback:', err);
         playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
       }
     });
@@ -217,7 +245,7 @@ export function speakText(
 }
 
 /**
- * Fallback to browser Web Speech API with clean, natural male pronunciation
+ * Fallback to browser Web Speech API with deep, low pitch to strictly preserve male interviewer tone
  */
 function playFallbackBrowserSpeech(
   cleanText: string,
@@ -239,13 +267,20 @@ function playFallbackBrowserSpeech(
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'ko-KR';
     
-    // Male voice settings: articulate tempo and clean pitch
-    utterance.rate = voiceTarget === 'Fenrir' ? 0.95 : 0.92;
-    utterance.pitch = voiceTarget === 'Fenrir' ? 0.94 : 0.88; 
+    const { voice, isExplicitMale } = getKoreanMaleVoice();
+    if (voice) {
+      utterance.voice = voice;
+    }
 
-    const koVoice = getKoreanVoice();
-    if (koVoice) {
-      utterance.voice = koVoice;
+    // If explicit male voice is found: standard natural pitch
+    // If only generic/female voice is available: significantly lower the pitch (0.68~0.75) to prevent high-pitched female robot sound
+    if (isExplicitMale) {
+      utterance.rate = voiceTarget === 'Fenrir' ? 0.95 : 0.92;
+      utterance.pitch = voiceTarget === 'Fenrir' ? 0.92 : 0.85;
+    } else {
+      // Deep pitch filter for fallback to simulate a calm male interviewer voice
+      utterance.rate = 0.90;
+      utterance.pitch = voiceTarget === 'Fenrir' ? 0.72 : 0.65;
     }
 
     utterance.onstart = () => {
@@ -269,6 +304,32 @@ function playFallbackBrowserSpeech(
     console.error('Speech synthesis fallback failed:', e);
     callbacks?.onEnd?.();
   }
+}
+
+/**
+ * Preload question audio in the background
+ */
+export function preloadTTS(text: string, voice?: TTSVoiceType) {
+  const targetVoice = voice || currentVoice;
+  const cleanText = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
+  const cacheKey = `v3_${targetVoice}_${cleanText}`;
+  
+  if (audioCache.has(cacheKey)) return;
+
+  fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: cleanText, voice: targetVoice })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data?.audioBase64) {
+        const audio = new Audio(`data:${data.mimeType || 'audio/mpeg'};base64,${data.audioBase64}`);
+        audio.preload = 'auto';
+        audioCache.set(cacheKey, audio);
+      }
+    })
+    .catch(() => {});
 }
 
 /**

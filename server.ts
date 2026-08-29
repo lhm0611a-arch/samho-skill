@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { QUESTIONS_DB } from './src/data';
 
 const app = express();
 const PORT = 3000;
@@ -49,20 +50,42 @@ function saveTtsIndex() {
   }
 }
 
-// Helper: Fetch Google Text-to-Speech raw audio
-async function fetchGoogleTTSAudio(text: string): Promise<Buffer> {
+// Helper: Fetch Google Text-to-Speech raw audio with retry and timeout
+async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
   const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ko&client=tw-ob`;
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Referer': 'https://translate.google.com/'
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Referer': 'https://translate.google.com/',
+          'Accept': '*/*'
+        }
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Google TTS engine returned status ${res.status}`);
+      }
+      const arrayBuf = await res.arrayBuffer();
+      if (arrayBuf.byteLength < 200) {
+        throw new Error('TTS buffer too small or truncated');
+      }
+      return Buffer.from(arrayBuf);
+    } catch (err: any) {
+      if (attempt === retries) {
+        throw err;
+      }
+      console.warn(`[TTS Retry ${attempt}/${retries}] for "${text.substring(0, 20)}":`, err.message);
+      await new Promise(r => setTimeout(r, 600 * attempt));
     }
-  });
-  if (!res.ok) {
-    throw new Error(`Google TTS engine returned status ${res.status}`);
   }
-  const arrayBuf = await res.arrayBuffer();
-  return Buffer.from(arrayBuf);
+  throw new Error('Failed to fetch TTS audio after retries');
 }
 
 // Transform raw audio into distinct, clear, crisp male Korean interviewer voices
@@ -244,6 +267,58 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
+async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolean> {
+  try {
+    const cleanKey = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
+    if (!cleanKey) return false;
+
+    const cacheVersion = 'v3_crisp_male';
+    const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${voice}:::${cleanKey}`).digest('hex').substring(0, 24);
+    const cacheKey = `${cacheVersion}_${voice}_${cleanKey}`;
+
+    if (serverTtsIndex.has(cacheKey)) {
+      const info = serverTtsIndex.get(cacheKey)!;
+      if (fs.existsSync(path.join(CACHE_DIR, info.filename))) return true;
+    }
+
+    const possibleMp3 = path.join(CACHE_DIR, `${hash}.mp3`);
+    if (fs.existsSync(possibleMp3)) {
+      serverTtsIndex.set(cacheKey, { filename: `${hash}.mp3`, mimeType: 'audio/mpeg' });
+      saveTtsIndex();
+      return true;
+    }
+
+    const rawBuffer = await fetchGoogleTTSAudio(cleanKey);
+    const finalBuffer = processVoiceAudio(rawBuffer, voice);
+    const targetFilename = `${hash}.mp3`;
+    fs.writeFileSync(path.join(CACHE_DIR, targetFilename), finalBuffer);
+    serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });
+    saveTtsIndex();
+    return true;
+  } catch (e: any) {
+    console.warn(`[Prewarm failed] for "${text.substring(0, 20)}":`, e.message);
+    return false;
+  }
+}
+
+// Background audio warmup for all questions in database
+async function startAudioWarmup() {
+  console.log('[TTS Pre-warm] Starting background audio pre-caching for all question sets...');
+  const allQuestions: string[] = [];
+  for (const set of QUESTIONS_DB) {
+    for (const q of set) {
+      if (!allQuestions.includes(q)) allQuestions.push(q);
+    }
+  }
+
+  // Pre-warm primarily for Fenrir (default) and Charon
+  for (const q of allQuestions) {
+    await ensureAudioCached(q, 'Fenrir');
+    await new Promise(r => setTimeout(r, 80)); // polite throttle
+  }
+  console.log(`[TTS Pre-warm] Completed caching for Fenrir (${serverTtsIndex.size} total audios ready).`);
+}
+
 // TTS Cache Status API (for monitoring)
 app.get('/api/tts/stats', (req, res) => {
   res.json({
@@ -270,6 +345,8 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    // Start non-blocking warmup in background
+    setTimeout(startAudioWarmup, 1000);
   });
 }
 

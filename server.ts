@@ -69,36 +69,41 @@ function saveTtsIndex() {
   }
 }
 
+let geminiTtsCooldownUntil = 0;
+
 // Helper: Fetch Authentic Human-like AI Neural Voice via Gemini TTS Model
 async function fetchGeminiNeuralTTSAudio(text: string, voice: string = 'Fenrir'): Promise<Buffer> {
-  const ai = getAI();
   const validVoice = ['Fenrir', 'Charon', 'Puck', 'Aoede', 'Kore', 'Zephyr'].includes(voice) ? voice : 'Fenrir';
+
+  // If currently in quota cooldown, immediately use formant-preserved engine
+  if (Date.now() < geminiTtsCooldownUntil) {
+    const rawAudio = await fetchGoogleTTSAudio(text);
+    return processVoiceAudio(rawAudio, validVoice);
+  }
+
+  const ai = getAI();
   const ttsModels = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
 
   for (const model of ttsModels) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
-          model: model,
-          contents: text,
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: validVoice
-                }
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: text,
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: validVoice
               }
             }
           }
-        });
-
-        const part = response.candidates?.[0]?.content?.parts?.[0];
-        const pcmBase64 = part?.inlineData?.data;
-        if (!pcmBase64) {
-          throw new Error(`Model ${model} returned empty audio data`);
         }
+      });
 
+      const part = response.candidates?.[0]?.content?.parts?.[0];
+      const pcmBase64 = part?.inlineData?.data;
+      if (pcmBase64) {
         const pcmBuffer = Buffer.from(pcmBase64, 'base64');
         const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const pcmFile = `/tmp/gemini_${tmpId}.pcm`;
@@ -106,7 +111,7 @@ async function fetchGeminiNeuralTTSAudio(text: string, voice: string = 'Fenrir')
 
         try {
           fs.writeFileSync(pcmFile, pcmBuffer);
-          // Convert 24kHz mono PCM to crisp MP3 with volume enhancement
+          // Convert 24kHz mono PCM to crisp MP3 with volume normalization
           execSync(`ffmpeg -y -f s16le -ar 24000 -ac 1 -i ${pcmFile} -af "volume=1.2" -b:a 128k ${mp3File}`, { stdio: 'ignore' });
           const mp3Buffer = fs.readFileSync(mp3File);
           return mp3Buffer;
@@ -116,19 +121,18 @@ async function fetchGeminiNeuralTTSAudio(text: string, voice: string = 'Fenrir')
             if (fs.existsSync(mp3File)) fs.unlinkSync(mp3File);
           } catch (_) {}
         }
-      } catch (err: any) {
-        console.warn(`[Gemini Neural TTS ${model} Attempt ${attempt}]`, err.message);
-        if (err.status === 429 || err.message?.includes('RESOURCE_EXHAUSTED')) {
-          await new Promise(r => setTimeout(r, 1200 * attempt));
-        } else {
-          break;
-        }
+      }
+    } catch (err: any) {
+      const isQuota = err.status === 429 || err.message?.includes('RESOURCE_EXHAUSTED') || err.message?.includes('429');
+      if (isQuota) {
+        geminiTtsCooldownUntil = Date.now() + 45000; // 45s cooldown
+        console.log(`[TTS Engine] Gemini quota active, seamlessly using high-fidelity formant engine for: "${text.substring(0, 18)}..."`);
+        break;
       }
     }
   }
 
-  // Graceful fallback to Formant-Preserved Korean Engine if temporary quota delay occurs
-  console.warn(`[Gemini Neural TTS Fallback] for "${text.substring(0, 20)}"`);
+  // Seamless fallback to Formant-Preserved Korean Engine
   const rawAudio = await fetchGoogleTTSAudio(text);
   return processVoiceAudio(rawAudio, validVoice);
 }
@@ -163,7 +167,7 @@ async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
   throw new Error('Fallback TTS failed');
 }
 
-// Transform raw audio into distinct male Korean interviewer voice with formant preservation
+// Transform raw audio into distinct male & female Korean interviewer voice with formant preservation
 function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
   const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const rawFile = `/tmp/raw_tts_${tmpId}.mp3`;
@@ -177,8 +181,14 @@ function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
       // 👨 AI 남성 2 (신뢰감 있는 중저음 면접관): 포먼트 보존 저음 피치
       filter = 'rubberband=pitch=0.82:tempo=0.98:formant=preserved,equalizer=f=2800:t=q:w=1.2:g=2.0,volume=1.25';
     } else if (voice === 'Puck') {
-      // 👨 AI 남성 3 (친근하고 밝은 면접관)
-      filter = 'rubberband=pitch=0.93:tempo=1.04:formant=preserved,equalizer=f=3500:t=q:w=1.2:g=2.5,volume=1.20';
+      // 👨 AI 남성 3 (친근하고 자연스러운 남성 면접관)
+      filter = 'rubberband=pitch=0.93:tempo=1.03:formant=preserved,equalizer=f=3500:t=q:w=1.2:g=2.5,volume=1.20';
+    } else if (voice === 'Aoede') {
+      // 👩 AI 여성 1 (단정하고 또렷한 여성 면접관)
+      filter = 'rubberband=pitch=1.08:tempo=1.0:formant=preserved,equalizer=f=3600:t=q:w=1.2:g=2.5,volume=1.20';
+    } else if (voice === 'Kore') {
+      // 👩 AI 여성 2 (부드러운 여성 면접관)
+      filter = 'rubberband=pitch=1.04:tempo=1.0:formant=preserved,equalizer=f=3400:t=q:w=1.2:g=2.0,volume=1.20';
     } else {
       // 👨 AI 남성 1 (차분하고 또렷한 표준 남성 면접관 - 기본): 포먼트 보존 표준 남성 피치
       filter = 'rubberband=pitch=0.88:tempo=1.02:formant=preserved,equalizer=f=3200:t=q:w=1.2:g=2.5,volume=1.20';

@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -6,7 +5,6 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import { QUESTIONS_DB } from './src/data';
 
 const app = express();
@@ -14,30 +12,12 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Lazy GoogleGenAI client initialization
-let aiClient: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI {
-  if (!aiClient) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
-    }
-    aiClient = new GoogleGenAI({ apiKey: key });
-  }
-  return aiClient;
-}
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Persistent Server Audio Cache Directory
 const CACHE_DIR = path.join(process.cwd(), 'server_cache', 'audio');
 if (!fs.existsSync(CACHE_DIR)) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
-}
-
-// Clean text key with question mark formatting for choice questions
-function cleanTtsText(text: string): string {
-  let cleaned = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
-  cleaned = cleaned.replace(/([가-힣]+(?:어요|아요|여요|에요|예요|나요|까요|지요|죠|있나요|없나요|됩니까|합니까)),(\s*)([가-힣]+)/g, '$1?$2$3');
-  return cleaned;
 }
 
 // In-Memory index of cached audio
@@ -70,125 +50,14 @@ function saveTtsIndex() {
   }
 }
 
-let geminiTtsCooldownUntil = 0;
-
-// Helper: Synthesize Ultra-Realistic 100% Human-like Korean Voice
-// Voice 1: ko-KR-InJoonNeural (인준: 맑고 또렷한 표준 한국인 남성 면접관 - 실제 사람 아나운서 톤)
-// Voice 2: ko-KR-HyunsuMultilingualNeural (현수: 신뢰감 있고 차분한 한국인 남성 면접관 - 실제 사람 대화 톤)
-async function fetchUltraRealisticKoreanVoice(text: string, voice: string = 'InJoon'): Promise<Buffer> {
-  const edgeVoice = (voice === 'Charon' || voice === 'Hyunsu') 
-    ? 'ko-KR-HyunsuMultilingualNeural' 
-    : 'ko-KR-InJoonNeural';
-
-  // 1. First Priority: Microsoft Neural Korean Engine (Indistinguishable from Real Human Speech)
-  try {
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(edgeVoice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-    const { audioStream } = tts.toStream(text);
-    
-    const audioBuffer = await new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      const timer = setTimeout(() => {
-        reject(new Error('Edge TTS stream timeout'));
-      }, 8000);
-
-      audioStream.on('data', (chunk: Buffer) => chunks.push(chunk));
-      audioStream.on('end', () => {
-        clearTimeout(timer);
-        const buf = Buffer.concat(chunks);
-        if (buf.length > 0) resolve(buf);
-        else reject(new Error('Empty audio stream received'));
-      });
-      audioStream.on('error', (err: any) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-    });
-
-    if (audioBuffer && audioBuffer.length > 0) {
-      return audioBuffer;
-    }
-  } catch (edgeErr: any) {
-    console.warn(`[Edge Neural TTS Fallback] ${edgeErr.message}`);
-  }
-
-  // 2. Second Priority: Gemini AI Neural TTS
-  return fetchGeminiNeuralTTSAudio(text, voice);
-}
-
-// Helper: Fetch Authentic Human-like AI Neural Voice via Gemini TTS Model
-async function fetchGeminiNeuralTTSAudio(text: string, voice: string = 'InJoon'): Promise<Buffer> {
-  const validVoice = (voice === 'Charon' || voice === 'Hyunsu') ? 'Charon' : 'Fenrir';
-
-  // If currently in quota cooldown, immediately use formant-preserved engine
-  if (Date.now() < geminiTtsCooldownUntil) {
-    const rawAudio = await fetchGoogleTTSAudio(text);
-    return processVoiceAudio(rawAudio, validVoice);
-  }
-
-  const ai = getAI();
-  const ttsModels = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
-
-  for (const model of ttsModels) {
-    try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: text,
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: validVoice
-              }
-            }
-          }
-        }
-      });
-
-      const part = response.candidates?.[0]?.content?.parts?.[0];
-      const pcmBase64 = part?.inlineData?.data;
-      if (pcmBase64) {
-        const pcmBuffer = Buffer.from(pcmBase64, 'base64');
-        const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        const pcmFile = `/tmp/gemini_${tmpId}.pcm`;
-        const mp3File = `/tmp/gemini_${tmpId}.mp3`;
-
-        try {
-          fs.writeFileSync(pcmFile, pcmBuffer);
-          // Convert 24kHz mono PCM to crisp MP3
-          execSync(`ffmpeg -y -f s16le -ar 24000 -ac 1 -i ${pcmFile} -b:a 128k ${mp3File}`, { stdio: 'ignore' });
-          const mp3Buffer = fs.readFileSync(mp3File);
-          return mp3Buffer;
-        } finally {
-          try {
-            if (fs.existsSync(pcmFile)) fs.unlinkSync(pcmFile);
-            if (fs.existsSync(mp3File)) fs.unlinkSync(mp3File);
-          } catch (_) {}
-        }
-      }
-    } catch (err: any) {
-      const isQuota = err.status === 429 || err.message?.includes('RESOURCE_EXHAUSTED') || err.message?.includes('429');
-      if (isQuota) {
-        geminiTtsCooldownUntil = Date.now() + 45000; // 45s cooldown
-        break;
-      }
-    }
-  }
-
-  // Seamless fallback to Formant-Preserved Korean Engine
-  const rawAudio = await fetchGoogleTTSAudio(text);
-  return processVoiceAudio(rawAudio, validVoice);
-}
-
-// Helper: Fallback Google Korean TTS raw audio
+// Helper: Fetch Google Text-to-Speech raw audio with retry and timeout
 async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
   const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ko&client=tw-ob`;
   
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch(url, {
         signal: controller.signal,
@@ -200,18 +69,27 @@ async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
       });
       clearTimeout(timeoutId);
 
-      if (!res.ok) throw new Error(`Status ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`Google TTS engine returned status ${res.status}`);
+      }
       const arrayBuf = await res.arrayBuffer();
+      if (arrayBuf.byteLength < 200) {
+        throw new Error('TTS buffer too small or truncated');
+      }
       return Buffer.from(arrayBuf);
     } catch (err: any) {
-      if (attempt === retries) throw err;
-      await new Promise(r => setTimeout(r, 400 * attempt));
+      if (attempt === retries) {
+        throw err;
+      }
+      console.warn(`[TTS Retry ${attempt}/${retries}] for "${text.substring(0, 20)}":`, err.message);
+      await new Promise(r => setTimeout(r, 600 * attempt));
     }
   }
-  throw new Error('Fallback TTS failed');
+  throw new Error('Failed to fetch TTS audio after retries');
 }
 
-// Transform raw audio into distinct male Korean interviewer voice with formant preservation & high clarity
+// Transform raw audio into distinct, clear, crisp male Korean interviewer voices
+// Eliminates muffled rumbling / animal-like bass distortion by using highpass filtering, vocal presence EQ, and crisp pitch scaling
 function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
   const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const rawFile = `/tmp/raw_tts_${tmpId}.mp3`;
@@ -219,18 +97,21 @@ function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
 
   try {
     fs.writeFileSync(rawFile, rawMp3Buffer);
-    
+
     let filter = '';
     if (voice === 'Charon') {
-      // 👨 AI 남성 2 (또렷한 중저음 면접관): 포먼트 보존 중저음 피치 + 딕션 명확화 이퀄라이저
-      filter = 'rubberband=pitch=0.82:tempo=0.98:formant=preserved,equalizer=f=2800:t=q:w=1.2:g=2.5,highpass=f=80,volume=1.25';
+      // 👨 AI 남성 2 (신뢰감 있는 면접관): 
+      // 120Hz 이하의 저음 뭉침을 방지하고, 2.8kHz~3.5kHz 영역을 부스팅하여 발음(자음/모음)이 또렷하고 분명하게 들리는 남성 톤
+      filter = 'highpass=f=120,asetrate=24000*0.89,atempo=1.12,equalizer=f=3000:width_type=o:width=1.0:g=3.5,equalizer=f=4500:width_type=o:width=1.0:g=2.0,volume=1.25,dynaudnorm=f=50:g=11';
     } else {
-      // 👨 AI 남성 1 (또렷한 표준음 면접관 - 기본): 포먼트 보존 표준 남성 피치 + 명확한 고음역 전달력
-      filter = 'rubberband=pitch=0.88:tempo=1.02:formant=preserved,equalizer=f=3200:t=q:w=1.2:g=3.0,highpass=f=90,volume=1.25';
+      // 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본):
+      // 아주 자연스럽고 깨끗한 표준 남성 면접관 발화 톤
+      filter = 'highpass=f=110,asetrate=24000*0.92,atempo=1.085,equalizer=f=3200:width_type=o:width=1.0:g=3.0,equalizer=f=1500:width_type=o:width=1.0:g=1.5,volume=1.20,dynaudnorm=f=50:g=11';
     }
 
-    execSync(`ffmpeg -y -i ${rawFile} -af "${filter}" -b:a 128k ${outFile}`, { stdio: 'ignore' });
-    return fs.readFileSync(outFile);
+    execSync(`ffmpeg -y -i ${rawFile} -filter:a "${filter}" -b:a 96k ${outFile}`, { stdio: 'ignore' });
+    const processedBuffer = fs.readFileSync(outFile);
+    return processedBuffer;
   } catch (e: any) {
     console.warn('FFmpeg voice processing fallback:', e.message);
     return rawMp3Buffer;
@@ -257,11 +138,10 @@ app.post('/api/generate-questions', async (req, res) => {
 난이도는 한국어능력시험(TOPIK) 1급 수준으로 아주 쉽고 명확하게 질문해 주세요.
 반드시 각 질문은 한 줄로 작성하되, 하나의 핵심 질문 뒤에 꼬리 질문을 '→' 로 이어주세요.
 질문 앞에는 "[신규]" 라는 말머리를 꼭 붙여주세요.
-[중요]: 둘 중 하나를 고르는 양자 택일 형태의 질문(예: ~했어요? ~했어요?, ~좋아요? ~좋아요?, 첫째예요? 막내예요?)은 중간 쉼표(,) 대신 반드시 물음표(?)를 각각 넣어주세요. (예: '버스를 탔어요? 걸어왔어요?', '첫째예요? 막내예요?')
 
 예시:
 [신규] 오늘 아침에 몇 시에 일어났어요? → 일어나서 제일 먼저 무엇을 했어요?
-[신규] 오늘 면접장에 올 때 버스를 탔어요? 걸어왔어요? → 오는데 시간이 얼마나 걸렸어요?
+[신규] 고향에서 가장 유명한 것은 무엇인가요? → 왜 그것이 유명해요?
 [신규] 용접을 할 때 제일 중요한 것이 무엇이라고 생각해요? → 불이 나면 어떻게 해요?
 
 총 ${count}개의 질문만 반환해주세요.`;
@@ -269,10 +149,9 @@ app.post('/api/generate-questions', async (req, res) => {
     let response;
     let retries = 3;
     let delay = 2000;
-    const aiInstance = getAI();
     while (retries > 0) {
       try {
-        response = await aiInstance.models.generateContent({
+        response = await ai.models.generateContent({
           model: 'gemini-3.7-flash',
           contents: prompt,
         });
@@ -298,23 +177,30 @@ app.post('/api/generate-questions', async (req, res) => {
   }
 });
 
-// TTS Synthesis & Persistent Audio Cache Handler (2 Ultra-Realistic Korean Male Voices)
+// TTS Synthesis & Persistent Audio Cache Handler (Male Interviewers Only)
 app.post('/api/tts', async (req, res) => {
   try {
-    const { text, voice = 'InJoon' } = req.body;
+    const { text, voice = 'Fenrir' } = req.body;
     
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Text parameter is required.' });
     }
 
-    // Clean text key with question mark formatting for choice questions
-    const cleanKey = cleanTtsText(text);
+    // Clean text key
+    const cleanKey = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
     
-    // Normalize voice selection to 2 distinct authentic Korean male voices
-    const validVoice = (voice === 'Charon' || voice === 'Hyunsu') ? 'Hyunsu' : 'InJoon';
+    // Normalize voice selection to Male voices:
+    // 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
+    // 'Charon': 👨 AI 남성 2 (신뢰감 있는 면접관)
+    let validVoice = 'Fenrir';
+    if (voice === 'Charon') {
+      validVoice = 'Charon';
+    } else {
+      validVoice = 'Fenrir';
+    }
     
-    // Versioned hash key for audio caching (Ultra-Realistic Human Korean)
-    const cacheVersion = 'v8_ultra_human_korean';
+    // Versioned hash key for audio caching
+    const cacheVersion = 'v3_crisp_male';
     const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
     const cacheKey = `${cacheVersion}_${validVoice}_${cleanKey}`;
 
@@ -347,8 +233,10 @@ app.post('/api/tts', async (req, res) => {
       });
     }
 
-    // 2. Generate authentic human-like Korean neural voice audio
-    const finalBuffer = await fetchUltraRealisticKoreanVoice(cleanKey, validVoice);
+    // 2. Generate crisp, high-definition male voice audio
+    let finalBuffer: Buffer | null = null;
+    const rawAudioBuffer = await fetchGoogleTTSAudio(cleanKey);
+    finalBuffer = processVoiceAudio(rawAudioBuffer, validVoice);
 
     if (!finalBuffer) {
       return res.status(500).json({ error: '음성 생성에 실패했습니다.' });
@@ -363,7 +251,7 @@ app.post('/api/tts', async (req, res) => {
     serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });
     saveTtsIndex();
 
-    console.log(`[Korean Human Voice Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
+    console.log(`[TTS Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
 
     // 4. Return audio to client
     return res.json({
@@ -379,15 +267,14 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
-async function ensureAudioCached(text: string, voice = 'InJoon'): Promise<boolean> {
+async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolean> {
   try {
-    const cleanKey = cleanTtsText(text);
+    const cleanKey = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
     if (!cleanKey) return false;
 
-    const validVoice = (voice === 'Charon' || voice === 'Hyunsu') ? 'Hyunsu' : 'InJoon';
-    const cacheVersion = 'v8_ultra_human_korean';
-    const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
-    const cacheKey = `${cacheVersion}_${validVoice}_${cleanKey}`;
+    const cacheVersion = 'v3_crisp_male';
+    const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${voice}:::${cleanKey}`).digest('hex').substring(0, 24);
+    const cacheKey = `${cacheVersion}_${voice}_${cleanKey}`;
 
     if (serverTtsIndex.has(cacheKey)) {
       const info = serverTtsIndex.get(cacheKey)!;
@@ -401,7 +288,8 @@ async function ensureAudioCached(text: string, voice = 'InJoon'): Promise<boolea
       return true;
     }
 
-    const finalBuffer = await fetchUltraRealisticKoreanVoice(cleanKey, validVoice);
+    const rawBuffer = await fetchGoogleTTSAudio(cleanKey);
+    const finalBuffer = processVoiceAudio(rawBuffer, voice);
     const targetFilename = `${hash}.mp3`;
     fs.writeFileSync(path.join(CACHE_DIR, targetFilename), finalBuffer);
     serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });
@@ -415,24 +303,20 @@ async function ensureAudioCached(text: string, voice = 'InJoon'): Promise<boolea
 
 // Background audio warmup for all questions in database
 async function startAudioWarmup() {
-  try {
-    console.log('[TTS Pre-warm] Starting background audio pre-caching for all question sets...');
-    const allQuestions: string[] = [];
-    for (const set of QUESTIONS_DB) {
-      for (const q of set) {
-        if (!allQuestions.includes(q)) allQuestions.push(q);
-      }
+  console.log('[TTS Pre-warm] Starting background audio pre-caching for all question sets...');
+  const allQuestions: string[] = [];
+  for (const set of QUESTIONS_DB) {
+    for (const q of set) {
+      if (!allQuestions.includes(q)) allQuestions.push(q);
     }
-
-    // Pre-warm primarily for InJoon (default) and Hyunsu
-    for (const q of allQuestions) {
-      await ensureAudioCached(q, 'InJoon');
-      await new Promise(r => setTimeout(r, 60)); // polite throttle
-    }
-    console.log(`[TTS Pre-warm] Completed caching for InJoon (${serverTtsIndex.size} total audios ready).`);
-  } catch (err: any) {
-    console.warn('[TTS Pre-warm] Background warmup encountered error (continuing normally):', err?.message || err);
   }
+
+  // Pre-warm primarily for Fenrir (default) and Charon
+  for (const q of allQuestions) {
+    await ensureAudioCached(q, 'Fenrir');
+    await new Promise(r => setTimeout(r, 80)); // polite throttle
+  }
+  console.log(`[TTS Pre-warm] Completed caching for Fenrir (${serverTtsIndex.size} total audios ready).`);
 }
 
 // TTS Cache Status API (for monitoring)

@@ -8,23 +8,31 @@ let currentAudio: HTMLAudioElement | null = null;
 let activeFetchController: AbortController | null = null;
 let currentPlaybackId = 0;
 
-// Male AI Interviewer Voices:
-// 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
-// 'Charon': 👨 AI 남성 2 (신뢰감 있는 면접관)
-export type TTSVoiceType = 'Fenrir' | 'Charon';
+// Male & Female AI Interviewer Voices:
+// 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 표준 면접관 - 기본)
+// 'Charon': 👨 AI 남성 2 (신뢰감 있고 중후한 면접관)
+// 'Puck': 👨 AI 남성 3 (친근하고 자연스러운 면접관)
+// 'Aoede': 👩 AI 여성 1 (단정하고 부드러운 면접관)
+// 'Kore': 👩 AI 여성 2 (또렷하고 밝은 면접관)
+export type TTSVoiceType = 'Fenrir' | 'Charon' | 'Puck' | 'Aoede' | 'Kore';
+
+const VALID_VOICES: TTSVoiceType[] = ['Fenrir', 'Charon', 'Puck', 'Aoede', 'Kore'];
 
 let currentVoice: TTSVoiceType = typeof window !== 'undefined' 
   ? (() => {
-      const saved = localStorage.getItem('hd_tts_voice');
-      if (saved === 'Charon' || saved === 'Fenrir') return saved;
+      const saved = localStorage.getItem('hd_tts_voice') as TTSVoiceType;
+      if (VALID_VOICES.includes(saved)) return saved;
       return 'Fenrir';
     })()
   : 'Fenrir';
 
 export function setTTSVoice(voice: TTSVoiceType | string) {
   let normalized: TTSVoiceType = 'Fenrir';
-  if (voice === 'Charon') normalized = 'Charon';
-  else normalized = 'Fenrir';
+  if (VALID_VOICES.includes(voice as TTSVoiceType)) {
+    normalized = voice as TTSVoiceType;
+  } else {
+    normalized = 'Fenrir';
+  }
 
   currentVoice = normalized;
   if (typeof window !== 'undefined') {
@@ -190,7 +198,7 @@ export function speakText(
   let cancelled = false;
   const isStale = () => cancelled || playbackId !== currentPlaybackId;
 
-  const cacheKey = `v5_formant_${voiceTarget}_${cleanText}`;
+  const cacheKey = `v6_gemini_${voiceTarget}_${cleanText}`;
 
   // 1. Check client-side audio memory cache first
   if (audioCache.has(cacheKey)) {

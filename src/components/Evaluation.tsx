@@ -1384,11 +1384,14 @@ export default function Evaluation() {
                     setSelectedVoice(v);
                     setTTSVoice(v);
                   }}
-                  className="bg-[#0a1b35] text-[10px] sm:text-[11px] font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-1.5 py-0.5 sm:py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors shrink min-w-0 truncate max-w-[90px] sm:max-w-[110px] h-7"
+                  className="bg-[#0a1b35] text-[10px] sm:text-[11px] font-semibold text-blue-300 border border-blue-500/30 rounded-lg px-1.5 py-0.5 sm:py-1 outline-none cursor-pointer hover:border-blue-400 transition-colors shrink min-w-0 truncate max-w-[100px] sm:max-w-[130px] h-7"
                   title="AI 면접관 음성 선택"
                 >
-                  <option value="Fenrir">👨 남성 1 (차분)</option>
-                  <option value="Charon">👨 남성 2 (신뢰)</option>
+                  <option value="Fenrir">👨 AI 남성 1 (차분)</option>
+                  <option value="Charon">👨 AI 남성 2 (신뢰)</option>
+                  <option value="Puck">👨 AI 남성 3 (친근)</option>
+                  <option value="Aoede">👩 AI 여성 1 (단정)</option>
+                  <option value="Kore">👩 AI 여성 2 (부드러움)</option>
                 </select>
 
                 <button

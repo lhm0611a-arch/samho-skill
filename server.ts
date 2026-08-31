@@ -69,14 +69,71 @@ function saveTtsIndex() {
   }
 }
 
-// Helper: Fetch Authentic Korean Voice audio with Rubberband Formant Preservation
-async function fetchHighQualityKoreanAudio(text: string, voice: string = 'Fenrir'): Promise<Buffer> {
-  const validVoice = voice === 'Charon' ? 'Charon' : (voice === 'Puck' ? 'Puck' : 'Fenrir');
+// Helper: Fetch Authentic Human-like AI Neural Voice via Gemini TTS Model
+async function fetchGeminiNeuralTTSAudio(text: string, voice: string = 'Fenrir'): Promise<Buffer> {
+  const ai = getAI();
+  const validVoice = ['Fenrir', 'Charon', 'Puck', 'Aoede', 'Kore', 'Zephyr'].includes(voice) ? voice : 'Fenrir';
+  const ttsModels = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
+
+  for (const model of ttsModels) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: model,
+          contents: text,
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: validVoice
+                }
+              }
+            }
+          }
+        });
+
+        const part = response.candidates?.[0]?.content?.parts?.[0];
+        const pcmBase64 = part?.inlineData?.data;
+        if (!pcmBase64) {
+          throw new Error(`Model ${model} returned empty audio data`);
+        }
+
+        const pcmBuffer = Buffer.from(pcmBase64, 'base64');
+        const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const pcmFile = `/tmp/gemini_${tmpId}.pcm`;
+        const mp3File = `/tmp/gemini_${tmpId}.mp3`;
+
+        try {
+          fs.writeFileSync(pcmFile, pcmBuffer);
+          // Convert 24kHz mono PCM to crisp MP3 with volume enhancement
+          execSync(`ffmpeg -y -f s16le -ar 24000 -ac 1 -i ${pcmFile} -af "volume=1.2" -b:a 128k ${mp3File}`, { stdio: 'ignore' });
+          const mp3Buffer = fs.readFileSync(mp3File);
+          return mp3Buffer;
+        } finally {
+          try {
+            if (fs.existsSync(pcmFile)) fs.unlinkSync(pcmFile);
+            if (fs.existsSync(mp3File)) fs.unlinkSync(mp3File);
+          } catch (_) {}
+        }
+      } catch (err: any) {
+        console.warn(`[Gemini Neural TTS ${model} Attempt ${attempt}]`, err.message);
+        if (err.status === 429 || err.message?.includes('RESOURCE_EXHAUSTED')) {
+          await new Promise(r => setTimeout(r, 1200 * attempt));
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  // Graceful fallback to Formant-Preserved Korean Engine if temporary quota delay occurs
+  console.warn(`[Gemini Neural TTS Fallback] for "${text.substring(0, 20)}"`);
   const rawAudio = await fetchGoogleTTSAudio(text);
   return processVoiceAudio(rawAudio, validVoice);
 }
 
-// Helper: Fetch Google Korean TTS raw audio
+// Helper: Fallback Google Korean TTS raw audio
 async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
   const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ko&client=tw-ob`;
   
@@ -210,12 +267,14 @@ app.post('/api/tts', async (req, res) => {
     
     // Normalize voice selection
     let validVoice = 'Fenrir';
-    if (voice === 'Charon') validVoice = 'Charon';
-    else if (voice === 'Puck') validVoice = 'Puck';
-    else validVoice = 'Fenrir';
+    if (['Fenrir', 'Charon', 'Puck', 'Aoede', 'Kore', 'Zephyr'].includes(voice)) {
+      validVoice = voice;
+    } else {
+      validVoice = 'Fenrir';
+    }
     
     // Versioned hash key for audio caching
-    const cacheVersion = 'v5_formant_korean';
+    const cacheVersion = 'v6_gemini_neural';
     const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
     const cacheKey = `${cacheVersion}_${validVoice}_${cleanKey}`;
 
@@ -248,8 +307,8 @@ app.post('/api/tts', async (req, res) => {
       });
     }
 
-    // 2. Generate authentic Korean voice audio with formant preservation
-    const finalBuffer = await fetchHighQualityKoreanAudio(cleanKey, validVoice);
+    // 2. Generate authentic Korean AI neural voice audio via Gemini TTS
+    const finalBuffer = await fetchGeminiNeuralTTSAudio(cleanKey, validVoice);
 
     if (!finalBuffer) {
       return res.status(500).json({ error: '음성 생성에 실패했습니다.' });
@@ -264,7 +323,7 @@ app.post('/api/tts', async (req, res) => {
     serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });
     saveTtsIndex();
 
-    console.log(`[Korean Voice Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
+    console.log(`[Gemini Neural Voice Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
 
     // 4. Return audio to client
     return res.json({
@@ -285,9 +344,10 @@ async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolea
     const cleanKey = cleanTtsText(text);
     if (!cleanKey) return false;
 
-    const cacheVersion = 'v5_formant_korean';
-    const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${voice}:::${cleanKey}`).digest('hex').substring(0, 24);
-    const cacheKey = `${cacheVersion}_${voice}_${cleanKey}`;
+    const validVoice = ['Fenrir', 'Charon', 'Puck', 'Aoede', 'Kore', 'Zephyr'].includes(voice) ? voice : 'Fenrir';
+    const cacheVersion = 'v6_gemini_neural';
+    const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
+    const cacheKey = `${cacheVersion}_${validVoice}_${cleanKey}`;
 
     if (serverTtsIndex.has(cacheKey)) {
       const info = serverTtsIndex.get(cacheKey)!;
@@ -301,7 +361,7 @@ async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolea
       return true;
     }
 
-    const finalBuffer = await fetchHighQualityKoreanAudio(cleanKey, voice);
+    const finalBuffer = await fetchGeminiNeuralTTSAudio(cleanKey, validVoice);
     const targetFilename = `${hash}.mp3`;
     fs.writeFileSync(path.join(CACHE_DIR, targetFilename), finalBuffer);
     serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });

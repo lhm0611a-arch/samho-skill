@@ -28,7 +28,9 @@ import {
   SCORES_20,
   SCORE_LABELS,
   QuestionItem,
+  QUESTION_POOL_STATS,
   generateCandidateQuestions,
+  getSetQuestions,
 } from "../data";
 import {
   getKoreanGrade,
@@ -68,7 +70,8 @@ export default function Evaluation() {
   const selectedUid = selectedCandidateUid;
   const setSelectedUid = setSelectedCandidateUid;
 
-  const [questionLevel, setQuestionLevel] = useState<"basic" | "intermediate" | "advanced">("basic");
+  const [questionLevel, setQuestionLevel] = useState<"basic" | "intermediate" | "advanced" | "set">("basic");
+  const [selectedSetNum, setSelectedSetNum] = useState<number>(1);
   const [candidateQuestions, setCandidateQuestions] = useState<{
     basic: QuestionItem[];
     intermediate: QuestionItem[];
@@ -489,38 +492,43 @@ export default function Evaluation() {
     setSMemo(p.memo || "");
 
     // Generate candidate questions (초급 10 / 중급 10 / 고급 10)
-    const currentSeed = shuffleSeeds[p.uid] || 0;
-    const generated = generateCandidateQuestions({
-      app_no: p.app_no,
-      name: p.name,
-      e9: p.e9,
-      seed: currentSeed,
-    });
+    const initialShuffleCount = shuffleSeeds[p.uid] || 0;
+    const generated = generateCandidateQuestions(
+      {
+        app_no: p.app_no,
+        name: p.name,
+        e9: p.e9,
+      },
+      initialShuffleCount
+    );
     setCandidateQuestions(generated);
   };
 
   // Re-generate questions when candidate or shuffle seed changes
   useEffect(() => {
     if (currentCandidate) {
-      const currentSeed = shuffleSeeds[currentCandidate.uid] || 0;
-      const generated = generateCandidateQuestions({
-        app_no: currentCandidate.app_no,
-        name: currentCandidate.name,
-        e9: currentCandidate.e9,
-        seed: currentSeed,
-      });
+      const shuffleCount = shuffleSeeds[currentCandidate.uid] || 0;
+      const generated = generateCandidateQuestions(
+        {
+          app_no: currentCandidate.app_no,
+          name: currentCandidate.name,
+          e9: currentCandidate.e9,
+        },
+        shuffleCount
+      );
       setCandidateQuestions(generated);
     }
   }, [currentCandidate, shuffleSeeds]);
 
   const manualShuffle = () => {
     if (!currentCandidate) return;
-    const newSeed = Date.now() + Math.floor(Math.random() * 1000000) + 1;
+    const currentCount = shuffleSeeds[currentCandidate.uid] || 0;
+    const nextCount = currentCount + 1;
     setShuffleSeeds((prev) => ({
       ...prev,
-      [currentCandidate.uid]: newSeed,
+      [currentCandidate.uid]: nextCount,
     }));
-    showToast("인터뷰 문항(초급 10 / 중급 10 / 고급 10)이 새롭게 재배정되었습니다.", "info");
+    showToast(`인터뷰 문항이 전체 문항 풀(총 ${QUESTION_POOL_STATS.totalCount}개)에서 골고루 순환 배정되었습니다. (${nextCount + 1}회차)`, "info");
   };
 
   const [playingTTS, setPlayingTTS] = useState<string | null>(null);
@@ -1374,8 +1382,8 @@ export default function Evaluation() {
                 <span className="font-black text-slate-100 text-xs sm:text-sm whitespace-nowrap">
                   인터뷰 문항
                 </span>
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 bg-[#0a1b35] px-1.5 py-0.5 rounded border border-[#1e3a5f] whitespace-nowrap shrink-0 hidden sm:inline-block">
-                  30문항 풀
+                <span className="text-[10px] sm:text-[11px] font-bold text-blue-300 bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0 hidden sm:inline-block" title={`전체 질문 풀 총 ${QUESTION_POOL_STATS.totalCount}개 (초급 ${QUESTION_POOL_STATS.basicCount}개 + 중급 ${QUESTION_POOL_STATS.intermediateCount}개 + 고급 ${QUESTION_POOL_STATS.advancedCount}개 + E-9 전용 ${QUESTION_POOL_STATS.e9Count}개)`}>
+                  총 {QUESTION_POOL_STATS.totalCount}문항 풀
                 </span>
               </div>
 
@@ -1396,17 +1404,17 @@ export default function Evaluation() {
 
                 <button
                   onClick={() => manualShuffle()}
-                  className="bg-[#0a1b35] border border-[#1e3a5f] hover:bg-[#1e3a5f] text-slate-300 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all flex items-center gap-1 shadow-sm shrink-0 whitespace-nowrap h-7"
-                  title="해당 인원 문항 랜덤 재배정"
+                  className="bg-[#0a1b35] border border-blue-500/40 hover:bg-blue-900/40 text-blue-200 hover:text-white px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-sm shrink-0 whitespace-nowrap h-7 active:scale-95"
+                  title={`전체 ${QUESTION_POOL_STATS.totalCount}문항 풀에서 특정 문항 편중 없이 골고루 순환 배정`}
                 >
                   <Shuffle className="w-3 h-3 text-blue-400 shrink-0" />
-                  <span className="hidden xs:inline sm:inline whitespace-nowrap">재배정</span>
+                  <span className="hidden xs:inline sm:inline whitespace-nowrap">랜덤 재배정</span>
                 </button>
               </div>
             </div>
 
-            {/* Level Selector Tabs: 초급 (10문항) / 중급 (10문항) / 고급 (10문항) */}
-            <div className="grid grid-cols-3 gap-1 bg-[#030f1c] p-0.5 sm:p-1 rounded-lg border border-[#1e3a5f]/80">
+            {/* Level Selector Tabs: 초급 (75개 중 10개) / 중급 (75개 중 10개) / 고급 (45개 중 10개) / 세트별(1~15) */}
+            <div className="grid grid-cols-4 gap-1 bg-[#030f1c] p-0.5 sm:p-1 rounded-lg border border-[#1e3a5f]/80">
               <button
                 type="button"
                 onClick={() => setQuestionLevel("basic")}
@@ -1415,14 +1423,15 @@ export default function Evaluation() {
                     ? "bg-emerald-600 text-white shadow-md shadow-emerald-950 font-black"
                     : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
                 }`}
+                title={`초급(기초) 전체 ${QUESTION_POOL_STATS.basicCount}문항 풀 중 10문항 균등 배정`}
               >
-                <span>초급<span className="hidden lg:inline font-normal text-[10px] text-emerald-200 ml-0.5">(기초)</span></span>
+                <span>초급<span className="hidden xl:inline font-normal text-[10px] text-emerald-200 ml-0.5">(기초)</span></span>
                 <span
                   className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
                     questionLevel === "basic" ? "bg-emerald-800 text-emerald-100 font-black" : "bg-slate-800 text-slate-400"
                   }`}
                 >
-                  10
+                  10/{QUESTION_POOL_STATS.basicCount}
                 </span>
               </button>
 
@@ -1434,14 +1443,15 @@ export default function Evaluation() {
                     ? "bg-blue-600 text-white shadow-md shadow-blue-950 font-black"
                     : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
                 }`}
+                title={`중급(직무) 전체 ${QUESTION_POOL_STATS.intermediateCount}문항 풀 중 10문항 균등 배정`}
               >
-                <span>중급<span className="hidden lg:inline font-normal text-[10px] text-blue-200 ml-0.5">(직무)</span></span>
+                <span>중급<span className="hidden xl:inline font-normal text-[10px] text-blue-200 ml-0.5">(직무)</span></span>
                 <span
                   className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
                     questionLevel === "intermediate" ? "bg-blue-800 text-blue-100 font-black" : "bg-slate-800 text-slate-400"
                   }`}
                 >
-                  10
+                  10/{QUESTION_POOL_STATS.intermediateCount}
                 </span>
               </button>
 
@@ -1453,14 +1463,35 @@ export default function Evaluation() {
                     ? "bg-purple-600 text-white shadow-md shadow-purple-950 font-black"
                     : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
                 }`}
+                title={`고급(심층) 전체 ${QUESTION_POOL_STATS.advancedCount}문항 풀 중 10문항 균등 배정`}
               >
-                <span>고급<span className="hidden lg:inline font-normal text-[10px] text-purple-200 ml-0.5">(심층)</span></span>
+                <span>고급<span className="hidden xl:inline font-normal text-[10px] text-purple-200 ml-0.5">(심층)</span></span>
                 <span
                   className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
                     questionLevel === "advanced" ? "bg-purple-800 text-purple-100 font-black" : "bg-slate-800 text-slate-400"
                   }`}
                 >
-                  10
+                  10/{QUESTION_POOL_STATS.advancedCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuestionLevel("set")}
+                className={`py-1 px-1 rounded-md font-bold text-[10px] sm:text-xs flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
+                  questionLevel === "set"
+                    ? "bg-amber-600 text-white shadow-md shadow-amber-950 font-black"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#0a1b35]"
+                }`}
+                title="원본 15개 세트별(13문항씩) 원문 직접 보기"
+              >
+                <span>세트별</span>
+                <span
+                  className={`text-[9px] sm:text-[10px] px-1 py-0.2 rounded font-mono shrink-0 ${
+                    questionLevel === "set" ? "bg-amber-800 text-amber-100 font-black" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  15SET
                 </span>
               </button>
             </div>
@@ -1469,7 +1500,11 @@ export default function Evaluation() {
           {/* Question List View */}
           <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 md:p-4 bg-[#030f1c] space-y-2 sm:space-y-2.5">
             {(() => {
-              const list: QuestionItem[] = candidateQuestions[questionLevel] || [];
+              const list: QuestionItem[] =
+                questionLevel === "set"
+                  ? getSetQuestions(selectedSetNum)
+                  : candidateQuestions[questionLevel] || [];
+
               if (list.length === 0) {
                 return (
                   <div className="p-8 text-center text-slate-400 text-xs">
@@ -1478,10 +1513,55 @@ export default function Evaluation() {
                 );
               }
 
-              return list.map((item, idx) => {
-                const isE9Special = !!item.isE9Special;
-                const cleanQ = item.q;
-                const cleanTail = item.tail || "";
+              const currentCycle = (shuffleSeeds[currentCandidate?.uid || ""] || 0) + 1;
+
+              return (
+                <>
+                  {questionLevel === "set" ? (
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-300 pb-2 px-1 border-b border-[#1e3a5f]/60 bg-[#051326]/60 p-2 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-amber-400">세트 선택:</span>
+                        <select
+                          value={selectedSetNum}
+                          onChange={(e) => setSelectedSetNum(Number(e.target.value))}
+                          className="bg-[#0a1b35] text-amber-300 font-bold border border-amber-500/50 rounded-lg px-2 py-0.5 outline-none cursor-pointer text-xs"
+                        >
+                          {Array.from({ length: 15 }, (_, i) => i + 1).map((sNum) => (
+                            <option key={sNum} value={sNum}>
+                              SET {sNum} (13문항 원문)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-slate-400 text-[10px]">
+                        SET {selectedSetNum} / 총 15세트 (195문항 원본)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 pb-1.5 px-1 border-b border-[#1e3a5f]/60">
+                      <span className="font-semibold text-slate-300">
+                        {questionLevel === "basic" && (
+                          currentCandidate?.e9 === "O"
+                            ? `E-9 필수 5문항 + 초급 원본풀(전체 ${QUESTION_POOL_STATS.basicCount}개) 중 5문항 균등 배정`
+                            : `초급 원본풀(전체 ${QUESTION_POOL_STATS.basicCount}개) 중 10문항 균등 배정`
+                        )}
+                        {questionLevel === "intermediate" && (
+                          `중급 원본풀(전체 ${QUESTION_POOL_STATS.intermediateCount}개) 중 10문항 균등 배정`
+                        )}
+                        {questionLevel === "advanced" && (
+                          `고급 원본풀(전체 ${QUESTION_POOL_STATS.advancedCount}개) 중 10문항 균등 배정`
+                        )}
+                      </span>
+                      <span className="text-blue-400 font-bold bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/40 text-[10px] shrink-0">
+                        순환 배정 {currentCycle}회차
+                      </span>
+                    </div>
+                  )}
+
+                  {list.map((item, idx) => {
+                    const isE9Special = !!item.isE9Special;
+                    const cleanQ = item.q;
+                    const cleanTail = item.tail || "";
 
                 return (
                   <div
@@ -1501,7 +1581,9 @@ export default function Evaluation() {
                           ? "bg-emerald-500"
                           : questionLevel === "intermediate"
                           ? "bg-blue-500"
-                          : "bg-purple-500"
+                          : questionLevel === "advanced"
+                          ? "bg-purple-500"
+                          : "bg-amber-500"
                       }`}
                     ></div>
 
@@ -1516,7 +1598,9 @@ export default function Evaluation() {
                                 ? "text-emerald-400"
                                 : questionLevel === "intermediate"
                                 ? "text-blue-400"
-                                : "text-purple-400"
+                                : questionLevel === "advanced"
+                                ? "text-purple-400"
+                                : "text-amber-400"
                             }`}
                           >
                             Q{idx + 1}.
@@ -1526,11 +1610,6 @@ export default function Evaluation() {
                             {isE9Special && (
                               <span className="font-black ml-2 text-[10px] bg-amber-950/80 text-amber-300 px-2 py-0.5 rounded border border-amber-500/60 align-middle inline-block">
                                 📋 E-9 근무이력 정보취득
-                              </span>
-                            )}
-                            {item.category && !isE9Special && (
-                              <span className="font-bold ml-1.5 text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 align-middle inline-block">
-                                {item.category}
                               </span>
                             )}
                           </span>
@@ -1577,7 +1656,9 @@ export default function Evaluation() {
                     </div>
                   </div>
                 );
-              });
+              })}
+                </>
+              );
             })()}
           </div>
         </div>

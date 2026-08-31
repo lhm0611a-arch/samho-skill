@@ -69,14 +69,21 @@ function saveTtsIndex() {
   }
 }
 
-// Helper: Fetch Google Text-to-Speech raw audio with retry and timeout
+// Helper: Fetch Authentic Korean Voice audio with Rubberband Formant Preservation
+async function fetchHighQualityKoreanAudio(text: string, voice: string = 'Fenrir'): Promise<Buffer> {
+  const validVoice = voice === 'Charon' ? 'Charon' : (voice === 'Puck' ? 'Puck' : 'Fenrir');
+  const rawAudio = await fetchGoogleTTSAudio(text);
+  return processVoiceAudio(rawAudio, validVoice);
+}
+
+// Helper: Fetch Google Korean TTS raw audio
 async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
   const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ko&client=tw-ob`;
   
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const res = await fetch(url, {
         signal: controller.signal,
@@ -88,27 +95,18 @@ async function fetchGoogleTTSAudio(text: string, retries = 3): Promise<Buffer> {
       });
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        throw new Error(`Google TTS engine returned status ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Status ${res.status}`);
       const arrayBuf = await res.arrayBuffer();
-      if (arrayBuf.byteLength < 200) {
-        throw new Error('TTS buffer too small or truncated');
-      }
       return Buffer.from(arrayBuf);
     } catch (err: any) {
-      if (attempt === retries) {
-        throw err;
-      }
-      console.warn(`[TTS Retry ${attempt}/${retries}] for "${text.substring(0, 20)}":`, err.message);
-      await new Promise(r => setTimeout(r, 600 * attempt));
+      if (attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, 400 * attempt));
     }
   }
-  throw new Error('Failed to fetch TTS audio after retries');
+  throw new Error('Fallback TTS failed');
 }
 
-// Transform raw audio into distinct, clear, crisp male Korean interviewer voices
-// Eliminates muffled rumbling / animal-like bass distortion by using highpass filtering, vocal presence EQ, and crisp pitch scaling
+// Transform raw audio into distinct male Korean interviewer voice with formant preservation
 function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
   const tmpId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const rawFile = `/tmp/raw_tts_${tmpId}.mp3`;
@@ -116,21 +114,21 @@ function processVoiceAudio(rawMp3Buffer: Buffer, voice: string): Buffer {
 
   try {
     fs.writeFileSync(rawFile, rawMp3Buffer);
-
+    
     let filter = '';
     if (voice === 'Charon') {
-      // 👨 AI 남성 2 (신뢰감 있는 면접관): 
-      // 120Hz 이하의 저음 뭉침을 방지하고, 2.8kHz~3.5kHz 영역을 부스팅하여 발음(자음/모음)이 또렷하고 분명하게 들리는 남성 톤
-      filter = 'highpass=f=120,asetrate=24000*0.89,atempo=1.12,equalizer=f=3000:width_type=o:width=1.0:g=3.5,equalizer=f=4500:width_type=o:width=1.0:g=2.0,volume=1.25,dynaudnorm=f=50:g=11';
+      // 👨 AI 남성 2 (신뢰감 있는 중저음 면접관): 포먼트 보존 저음 피치
+      filter = 'rubberband=pitch=0.82:tempo=0.98:formant=preserved,equalizer=f=2800:t=q:w=1.2:g=2.0,volume=1.25';
+    } else if (voice === 'Puck') {
+      // 👨 AI 남성 3 (친근하고 밝은 면접관)
+      filter = 'rubberband=pitch=0.93:tempo=1.04:formant=preserved,equalizer=f=3500:t=q:w=1.2:g=2.5,volume=1.20';
     } else {
-      // 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본):
-      // 아주 자연스럽고 깨끗한 표준 남성 면접관 발화 톤
-      filter = 'highpass=f=110,asetrate=24000*0.92,atempo=1.085,equalizer=f=3200:width_type=o:width=1.0:g=3.0,equalizer=f=1500:width_type=o:width=1.0:g=1.5,volume=1.20,dynaudnorm=f=50:g=11';
+      // 👨 AI 남성 1 (차분하고 또렷한 표준 남성 면접관 - 기본): 포먼트 보존 표준 남성 피치
+      filter = 'rubberband=pitch=0.88:tempo=1.02:formant=preserved,equalizer=f=3200:t=q:w=1.2:g=2.5,volume=1.20';
     }
 
-    execSync(`ffmpeg -y -i ${rawFile} -filter:a "${filter}" -b:a 96k ${outFile}`, { stdio: 'ignore' });
-    const processedBuffer = fs.readFileSync(outFile);
-    return processedBuffer;
+    execSync(`ffmpeg -y -i ${rawFile} -af "${filter}" -b:a 128k ${outFile}`, { stdio: 'ignore' });
+    return fs.readFileSync(outFile);
   } catch (e: any) {
     console.warn('FFmpeg voice processing fallback:', e.message);
     return rawMp3Buffer;
@@ -198,7 +196,7 @@ app.post('/api/generate-questions', async (req, res) => {
   }
 });
 
-// TTS Synthesis & Persistent Audio Cache Handler (Male Interviewers Only)
+// TTS Synthesis & Persistent Audio Cache Handler (Gemini Neural Korean Voices)
 app.post('/api/tts', async (req, res) => {
   try {
     const { text, voice = 'Fenrir' } = req.body;
@@ -210,18 +208,14 @@ app.post('/api/tts', async (req, res) => {
     // Clean text key with question mark formatting for choice questions
     const cleanKey = cleanTtsText(text);
     
-    // Normalize voice selection to Male voices:
-    // 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
-    // 'Charon': 👨 AI 남성 2 (신뢰감 있는 면접관)
+    // Normalize voice selection
     let validVoice = 'Fenrir';
-    if (voice === 'Charon') {
-      validVoice = 'Charon';
-    } else {
-      validVoice = 'Fenrir';
-    }
+    if (voice === 'Charon') validVoice = 'Charon';
+    else if (voice === 'Puck') validVoice = 'Puck';
+    else validVoice = 'Fenrir';
     
     // Versioned hash key for audio caching
-    const cacheVersion = 'v3_crisp_male';
+    const cacheVersion = 'v5_formant_korean';
     const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${validVoice}:::${cleanKey}`).digest('hex').substring(0, 24);
     const cacheKey = `${cacheVersion}_${validVoice}_${cleanKey}`;
 
@@ -254,10 +248,8 @@ app.post('/api/tts', async (req, res) => {
       });
     }
 
-    // 2. Generate crisp, high-definition male voice audio
-    let finalBuffer: Buffer | null = null;
-    const rawAudioBuffer = await fetchGoogleTTSAudio(cleanKey);
-    finalBuffer = processVoiceAudio(rawAudioBuffer, validVoice);
+    // 2. Generate authentic Korean voice audio with formant preservation
+    const finalBuffer = await fetchHighQualityKoreanAudio(cleanKey, validVoice);
 
     if (!finalBuffer) {
       return res.status(500).json({ error: '음성 생성에 실패했습니다.' });
@@ -272,7 +264,7 @@ app.post('/api/tts', async (req, res) => {
     serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });
     saveTtsIndex();
 
-    console.log(`[TTS Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
+    console.log(`[Korean Voice Generated] Voice: ${validVoice} | Text: "${cleanKey.substring(0, 25)}..." -> ${targetFilename}`);
 
     // 4. Return audio to client
     return res.json({
@@ -293,7 +285,7 @@ async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolea
     const cleanKey = cleanTtsText(text);
     if (!cleanKey) return false;
 
-    const cacheVersion = 'v3_crisp_male';
+    const cacheVersion = 'v5_formant_korean';
     const hash = crypto.createHash('sha256').update(`${cacheVersion}:::${voice}:::${cleanKey}`).digest('hex').substring(0, 24);
     const cacheKey = `${cacheVersion}_${voice}_${cleanKey}`;
 
@@ -309,8 +301,7 @@ async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolea
       return true;
     }
 
-    const rawBuffer = await fetchGoogleTTSAudio(cleanKey);
-    const finalBuffer = processVoiceAudio(rawBuffer, voice);
+    const finalBuffer = await fetchHighQualityKoreanAudio(cleanKey, voice);
     const targetFilename = `${hash}.mp3`;
     fs.writeFileSync(path.join(CACHE_DIR, targetFilename), finalBuffer);
     serverTtsIndex.set(cacheKey, { filename: targetFilename, mimeType: 'audio/mpeg' });

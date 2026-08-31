@@ -5,6 +5,8 @@ const audioCache = new Map<string, HTMLAudioElement>();
 
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 let currentAudio: HTMLAudioElement | null = null;
+let activeFetchController: AbortController | null = null;
+let currentPlaybackId = 0;
 
 // Male AI Interviewer Voices:
 // 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
@@ -78,11 +80,22 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
  * Stop any ongoing TTS audio immediately
  */
 export function stopTTS() {
+  currentPlaybackId++; // Invalidate any pending async callbacks
+
+  if (activeFetchController) {
+    try {
+      activeFetchController.abort();
+    } catch (_) {}
+    activeFetchController = null;
+  }
+
   if (currentAudio) {
     try {
       currentAudio.pause();
       currentAudio.currentTime = 0;
-      currentAudio.src = '';
+      currentAudio.onplay = null;
+      currentAudio.onended = null;
+      currentAudio.onerror = null;
     } catch (_) {}
     currentAudio = null;
   }
@@ -160,9 +173,10 @@ export function speakText(
   },
   voiceOverride?: TTSVoiceType
 ): () => void {
-  // Stop previous playback
+  // 1. Immediately stop and cancel any previous playback or pending requests
   stopTTS();
 
+  const playbackId = ++currentPlaybackId;
   const voiceTarget = voiceOverride || currentVoice;
 
   // Clean text and apply natural speech intonation formatting
@@ -174,44 +188,58 @@ export function speakText(
   }
 
   let cancelled = false;
-  const cacheKey = `v3_${voiceTarget}_${cleanText}`;
+  const isStale = () => cancelled || playbackId !== currentPlaybackId;
+
+  const cacheKey = `v5_formant_${voiceTarget}_${cleanText}`;
 
   // 1. Check client-side audio memory cache first
   if (audioCache.has(cacheKey)) {
     const cachedAudio = audioCache.get(cacheKey)!;
-    cachedAudio.currentTime = 0;
+    try {
+      cachedAudio.pause();
+      cachedAudio.currentTime = 0;
+    } catch (_) {}
+
     currentAudio = cachedAudio;
 
     cachedAudio.onplay = () => {
-      if (!cancelled) callbacks?.onStart?.();
+      if (!isStale()) callbacks?.onStart?.();
     };
     cachedAudio.onended = () => {
-      currentAudio = null;
-      if (!cancelled) callbacks?.onEnd?.();
+      if (currentAudio === cachedAudio) currentAudio = null;
+      if (!isStale()) callbacks?.onEnd?.();
     };
     cachedAudio.onerror = (e) => {
-      console.warn('Cached audio playback failed, trying server refetch:', e);
-      currentAudio = null;
-      if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+      if (currentAudio === cachedAudio) currentAudio = null;
+      console.warn('Cached audio playback failed, trying fallback:', e);
+      if (!isStale()) {
+        playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget, playbackId);
+      }
     };
 
     cachedAudio.play().catch(e => {
-      console.warn('Cached audio play promise rejected, trying Web Speech fallback:', e);
-      if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+      if (currentAudio === cachedAudio) currentAudio = null;
+      console.warn('Cached audio play promise rejected, trying fallback:', e);
+      if (!isStale()) {
+        playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget, playbackId);
+      }
     });
 
     return () => {
       cancelled = true;
-      stopTTS();
+      if (playbackId === currentPlaybackId) {
+        stopTTS();
+      }
     };
   }
 
   // 2. Fetch from backend TTS endpoint (persisted server audio) with retry
   const fetchController = new AbortController();
+  activeFetchController = fetchController;
 
   fetchServerTTSAudio(cleanText, voiceTarget, fetchController.signal)
     .then((data) => {
-      if (cancelled) return;
+      if (isStale()) return;
 
       if (data?.audioBase64) {
         const audioSrc = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audioBase64}`;
@@ -219,18 +247,20 @@ export function speakText(
         audio.preload = 'auto';
 
         audio.onplay = () => {
-          if (!cancelled) callbacks?.onStart?.();
+          if (!isStale()) callbacks?.onStart?.();
         };
 
         audio.onended = () => {
-          currentAudio = null;
-          if (!cancelled) callbacks?.onEnd?.();
+          if (currentAudio === audio) currentAudio = null;
+          if (!isStale()) callbacks?.onEnd?.();
         };
 
         audio.onerror = (e) => {
+          if (currentAudio === audio) currentAudio = null;
           console.warn('Audio playback error, falling back to Web Speech:', e);
-          currentAudio = null;
-          if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+          if (!isStale()) {
+            playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget, playbackId);
+          }
         };
 
         // Cache in client memory
@@ -238,25 +268,34 @@ export function speakText(
         currentAudio = audio;
 
         audio.play().catch(err => {
+          if (currentAudio === audio) currentAudio = null;
           console.warn('Audio play() rejected, trying Web Speech fallback:', err);
-          if (!cancelled) playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+          if (!isStale()) {
+            playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget, playbackId);
+          }
         });
       } else {
         throw new Error('No audio data received from server');
       }
     })
     .catch((err) => {
-      if (cancelled) return;
+      if (isStale()) return;
       if (err.name !== 'AbortError') {
         console.warn('Server TTS failed, using low-pitch male browser speech fallback:', err);
-        playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget);
+        playFallbackBrowserSpeech(cleanText, callbacks, voiceTarget, playbackId);
+      }
+    })
+    .finally(() => {
+      if (activeFetchController === fetchController) {
+        activeFetchController = null;
       }
     });
 
   return () => {
     cancelled = true;
-    fetchController.abort();
-    stopTTS();
+    if (playbackId === currentPlaybackId) {
+      stopTTS();
+    }
   };
 }
 
@@ -270,10 +309,16 @@ function playFallbackBrowserSpeech(
     onEnd?: () => void;
     onError?: (err?: any) => void;
   },
-  voiceTarget: TTSVoiceType = currentVoice
+  voiceTarget: TTSVoiceType = currentVoice,
+  playbackId?: number
 ) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     callbacks?.onEnd?.();
+    return;
+  }
+
+  // If another playback has already started, do not run fallback speech
+  if (playbackId !== undefined && playbackId !== currentPlaybackId) {
     return;
   }
 
@@ -288,30 +333,33 @@ function playFallbackBrowserSpeech(
       utterance.voice = voice;
     }
 
-    // If explicit male voice is found: standard natural pitch
-    // If only generic/female voice is available: significantly lower the pitch (0.68~0.75) to prevent high-pitched female robot sound
     if (isExplicitMale) {
       utterance.rate = voiceTarget === 'Fenrir' ? 0.95 : 0.92;
       utterance.pitch = voiceTarget === 'Fenrir' ? 0.92 : 0.85;
     } else {
-      // Deep pitch filter for fallback to simulate a calm male interviewer voice
       utterance.rate = 0.90;
       utterance.pitch = voiceTarget === 'Fenrir' ? 0.72 : 0.65;
     }
 
     utterance.onstart = () => {
-      callbacks?.onStart?.();
+      if (playbackId === undefined || playbackId === currentPlaybackId) {
+        callbacks?.onStart?.();
+      }
     };
 
     utterance.onend = () => {
       currentUtterance = null;
-      callbacks?.onEnd?.();
+      if (playbackId === undefined || playbackId === currentPlaybackId) {
+        callbacks?.onEnd?.();
+      }
     };
 
     utterance.onerror = (e) => {
       currentUtterance = null;
-      callbacks?.onError?.(e);
-      callbacks?.onEnd?.();
+      if (playbackId === undefined || playbackId === currentPlaybackId) {
+        callbacks?.onError?.(e);
+        callbacks?.onEnd?.();
+      }
     };
 
     currentUtterance = utterance;

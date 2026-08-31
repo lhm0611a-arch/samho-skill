@@ -489,10 +489,12 @@ export default function Evaluation() {
     setSMemo(p.memo || "");
 
     // Generate candidate questions (초급 10 / 중급 10 / 고급 10)
+    const currentSeed = shuffleSeeds[p.uid] || 0;
     const generated = generateCandidateQuestions({
       app_no: p.app_no,
       name: p.name,
       e9: p.e9,
+      seed: currentSeed,
     });
     setCandidateQuestions(generated);
   };
@@ -500,10 +502,12 @@ export default function Evaluation() {
   // Re-generate questions when candidate or shuffle seed changes
   useEffect(() => {
     if (currentCandidate) {
+      const currentSeed = shuffleSeeds[currentCandidate.uid] || 0;
       const generated = generateCandidateQuestions({
         app_no: currentCandidate.app_no,
-        name: currentCandidate.name + (shuffleSeeds[currentCandidate.uid] ? `_${shuffleSeeds[currentCandidate.uid]}` : ""),
+        name: currentCandidate.name,
         e9: currentCandidate.e9,
+        seed: currentSeed,
       });
       setCandidateQuestions(generated);
     }
@@ -511,13 +515,12 @@ export default function Evaluation() {
 
   const manualShuffle = () => {
     if (!currentCandidate) return;
-    const currentSeed = shuffleSeeds[currentCandidate.uid] || 0;
-    const newSeed = currentSeed + Math.floor(Math.random() * 1000) + 1;
+    const newSeed = Date.now() + Math.floor(Math.random() * 1000000) + 1;
     setShuffleSeeds((prev) => ({
       ...prev,
       [currentCandidate.uid]: newSeed,
     }));
-    showToast("인터뷰 문항(초급/중급/고급)이 새롭게 재배정되었습니다.", "info");
+    showToast("인터뷰 문항(초급 10 / 중급 10 / 고급 10)이 새롭게 재배정되었습니다.", "info");
   };
 
   const [playingTTS, setPlayingTTS] = useState<string | null>(null);

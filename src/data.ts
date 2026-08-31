@@ -5,7 +5,7 @@ export interface QuestionItem {
   isE9Special?: boolean;
 }
 
-// 1. E-9 비자 경험자 전용 필수/기본 정보 취득 질문 (한국어 평가보다 정확한 근무 이력 및 현황 파악 목적)
+// 1. E-9 비자 경험자 전용 정보 취득 질문 풀 (한국어 평가 및 국내 근무 이력/적응도 다각도 검증)
 export const E9_DEFAULT_QUESTIONS: QuestionItem[] = [
   {
     q: "한국에서 몇 년 동안 일했어요?",
@@ -14,14 +14,14 @@ export const E9_DEFAULT_QUESTIONS: QuestionItem[] = [
     isE9Special: true
   },
   {
-    q: "어느 회사에서 어떤 일을 했어요?",
+    q: "어느 지역 어느 회사에서 어떤 일을 했어요?",
     tail: "그 일에서 제일 자신 있는 작업은 뭐예요?",
     category: 'E9정보',
     isE9Special: true
   },
   {
     q: "한국에 언제부터 언제까지 있었어요?",
-    tail: "한국에 있을 때 한국어는 어떻게 배웠어요?",
+    tail: "한국에 있을 때 한국어는 주로 누구와 대화하며 배웠어요?",
     category: 'E9정보',
     isE9Special: true
   },
@@ -33,20 +33,63 @@ export const E9_DEFAULT_QUESTIONS: QuestionItem[] = [
   },
   {
     q: "한국 다녀와서 지금은 고향에서 무슨 일 해요?",
-    tail: "한국에서 배운 기술이 지금 하는 일에 도움이 돼요?",
+    tail: "한국에서 배운 기술이 지금 고향에서 하는 일에 도움이 돼요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국에서 일할 때 한국인 반장님이나 동료들과 사이는 어땠어요?",
+    tail: "지금도 가끔 안부 연락을 주고받는 한국 동료가 있어요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국에서 일할 때 가장 힘들었던 점은 무엇이었고 어떻게 이겨냈어요?",
+    tail: "스트레스가 쌓일 때 주로 어떤 방법으로 풀었어요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국에서 일할 때 안전사고 없이 무사히 귀국했나요?",
+    tail: "현장에서 안전 수칙을 지키기 위해 평소에 어떤 노력을 했어요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국에서 번 돈으로 고향 가족들을 위해 무엇을 했어요?",
+    tail: "이번에 한국에 다시 가면 어떤 새로운 목표를 이루고 싶어요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국 생활 중에서 가장 기억에 남는 좋은 추억이 뭐예요?",
+    tail: "다시 한국에 입국하면 제일 먼저 가보고 싶은 곳이 있어요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국 음식 중에서 무엇을 가장 맛있게 먹었어요?",
+    tail: "매운 김치찌개나 된장찌개도 잘 먹는 편이에요?",
+    category: 'E9정보',
+    isE9Special: true
+  },
+  {
+    q: "한국 공장에서 쓰던 한국어 작업 용어를 기억나는 대로 말해 볼 수 있어요?",
+    tail: "반장님이 작업 지시할 때 못 알아듣는 말이 있으면 어떻게 대처했나요?",
     category: 'E9정보',
     isE9Special: true
   }
 ];
 
 // 2. 난이도별 질문 풀 (QUESTIONS_DIFFICULTY_POOL)
-// 초급 (Basic): 단답형 가능, 신상/기초 인사/생활 및 직관적 안전 질문 (이해하기 쉬운 짧고 명확한 어휘)
+// 초급 (Basic): 단답형 가능, 신상/기초 인사/생활 및 직관적 안전 질문 (45개 이상의 풍부한 문항 풀)
 export const QUESTIONS_POOL_BASIC: QuestionItem[] = [
   { q: "이름이 뭐예요?", tail: "이름을 한 글자씩 천천히 말해 줄 수 있어요?", category: "신상/기초" },
   { q: "나이가 몇 살이에요?", tail: "생일이 언제예요?", category: "신상/기초" },
   { q: "고향이 어디예요?", tail: "고향은 어떤 곳인지 간단히 소개해 줄 수 있어요?", category: "신상/기초" },
   { q: "오늘 무슨 요일이에요?", tail: "내일은 무슨 요일이에요?", category: "신상/기초" },
-  { q: "오늘 아침 몇 시에 일어났어요?", tail: "일어나서 제일 먼저 무엇을 했어요?", category: "신상/기초" },
+  { q: "지금 몇 시 몇 분이에요?", tail: "오늘 아침 몇 시에 일어났어요?", category: "신상/기초" },
+  { q: "오늘 아침에 무엇을 먹었어요?", tail: "일어나서 제일 먼저 무엇을 했어요?", category: "신상/기초" },
   { q: "결혼은 했어요?", tail: "가족이 몇 명이에요?", category: "신상/기초" },
   { q: "형제나 자매가 몇 명 있어요?", tail: "첫째예요? 막내예요?", category: "신상/기초" },
   { q: "부모님은 지금 어디에 사세요?", tail: "부모님은 건강하세요?", category: "신상/기초" },
@@ -63,10 +106,31 @@ export const QUESTIONS_POOL_BASIC: QuestionItem[] = [
   { q: "먼지가 많이 나는 곳에서 일할 때 얼굴에 무엇을 써야 해요?", tail: "마스크가 더러워지면 어떻게 해요?", category: "안전/기숙사" },
   { q: "반장님이 '조심해!' 하고 소리치면 어떻게 할 거예요?", tail: "위험을 확인하고 반장님께 뭐라고 대답할 거예요?", category: "안전/기숙사" },
   { q: "하루 8시간 동안 서서 일할 수 있어요?", tail: "건강이나 체력 관리는 어떻게 해요?", category: "직무/작업" },
-  { q: "기숙사 방에서 담배를 피워도 돼요? 안 돼요?", tail: "룸메이트가 방에서 담배를 피우려고 하면 어떻게 말릴 거예요?", category: "안전/기숙사" }
+  { q: "기숙사 방에서 담배를 피워도 돼요? 안 돼요?", tail: "룸메이트가 방에서 담배를 피우려고 하면 어떻게 말릴 거예요?", category: "안전/기숙사" },
+  { q: "어젯밤에는 몇 시에 잠을 잤어요?", tail: "오늘 아침에 피곤하지는 않았어요?", category: "신상/기초" },
+  { q: "고향에서 제일 좋아하는 장소는 어디예요?", tail: "그곳에 가면 기분이 어때요?", category: "신상/기초" },
+  { q: "한국 노래나 한국 드라마를 본 적이 있어요?", tail: "어떤 가수나 드라마를 좋아해요?", category: "신상/기초" },
+  { q: "한국 사람을 직접 만나서 이야기해 본 적이 있어요?", tail: "처음 만났을 때 어떤 말을 나눴어요?", category: "신상/기초" },
+  { q: "손으로 물건을 고치거나 만드는 것을 좋아해요?", tail: "집에서 무엇을 직접 고쳐본 적이 있어요?", category: "직무/작업" },
+  { q: "식사할 때 주로 고기를 많이 먹어요? 채소를 많이 먹어요?", tail: "매운 음식도 잘 먹을 수 있어요?", category: "신상/기초" },
+  { q: "약속 시간보다 일찍 도착해서 준비하는 편이에요?", tail: "친구와 약속하면 보통 몇 분 전에 나가요?", category: "신상/기초" },
+  { q: "다른 나라에 여행이나 일하러 가 본 적이 있어요?", tail: "그 나라에서 기억에 남는 일이 있어요?", category: "신상/기초" },
+  { q: "손동작이나 작업 속도가 빠른 편이에요?", tail: "손을 빠르게 움직이는 운동이나 취미가 있어요?", category: "신상/기초" },
+  { q: "버스나 배를 탈 때 멀미를 하는 편이에요?", tail: "멀미를 안 하려고 평소에 어떻게 해요?", category: "신상/기초" },
+  { q: "면접을 시작할 때보다 지금 긴장이 조금 풀렸어요?", tail: "오늘 면접을 위해 한국어 연습을 많이 했어요?", category: "신상/기초" },
+  { q: "동료가 무거운 물건을 같이 들어주면 한국어로 뭐라고 말할 거예요?", tail: "도움을 받았을 때 고마운 마음을 어떻게 전해요?", category: "신상/기초" },
+  { q: "작업할 때 입는 옷은 왜 지퍼나 단추를 끝까지 채워야 해요?", tail: "옷이 기계에 걸리지 않게 하려면 어떻게 해야 할까요?", category: "안전/기숙사" },
+  { q: "공장에 비상벨이 요란하게 울리면 하던 일을 멈춰야 할까요?", tail: "멈추고 나서 어디로 대피해야 할까요?", category: "안전/기숙사" },
+  { q: "작업장 바닥에 쓰레기나 날카로운 쇠조각이 떨어져 있으면 어떻게 해요?", tail: "치우고 나서 주변을 어떻게 확인할 거예요?", category: "안전/기숙사" },
+  { q: "기숙사 화장실을 쓰고 나면 깨끗하게 물을 내리고 나와야 하는 이유가 뭘까요?", tail: "다음 사람이 기분 좋게 쓰려면 어떻게 청소해야 할까요?", category: "안전/기숙사" },
+  { q: "아침에 작업 시작하기 전에 다 같이 모여서 체조를 하는 이유가 뭐예요?", tail: "체조를 하면 몸이 어떻게 풀려요?", category: "안전/기숙사" },
+  { q: "회사에 출근할 때 신분증과 출입증을 왜 꼭 가지고 다녀야 할까요?", tail: "출입증을 잃어버리지 않으려면 어디에 보관할 거예요?", category: "신상/기초" },
+  { q: "한국에서 일할 때 고향 가족들이 많이 보고 싶으면 어떻게 참을 거예요?", tail: "가족들과 영상통화는 일주일에 몇 번 할 생각이에요?", category: "신상/기초" },
+  { q: "작업장에 타는 냄새가 나면 제일 먼저 어떻게 할 거예요?", tail: "반장님께 즉시 뭐라고 보고할 거예요?", category: "안전/기숙사" },
+  { q: "용접 기계를 만질 때 손에 물기가 있으면 왜 안 돼요?", tail: "감전을 막으려면 손을 어떻게 말려야 해요?", category: "직무/작업" }
 ];
 
-// 중급 (Intermediate): 문장형 답변 요구, 직무 지침 이해, 작업 흐름, 기숙사 공동생활 규범 및 일반 대처
+// 3. 중급 (Intermediate): 문장형 답변 요구, 직무 지침 이해, 작업 흐름, 기숙사 공동생활 규범 및 일반 대처 (45개 이상의 문항 풀)
 export const QUESTIONS_POOL_INTERMEDIATE: QuestionItem[] = [
   { q: "고향에서는 주로 어떤 회사에서 무슨 일을 했어요?", tail: "그 일에서 제일 중요하게 생각했던 것은 뭐예요?", category: "직무/작업" },
   { q: "한국 회사에 왜 가고 싶어요?", tail: "한국에서 일해서 이루고 싶은 목표가 있어요?", category: "신상/기초" },
@@ -87,10 +151,32 @@ export const QUESTIONS_POOL_INTERMEDIATE: QuestionItem[] = [
   { q: "혼자 일하는 것이 좋아요? 여러 명이 함께 일하는 것이 좋아요?", tail: "동료들과 같이 일할 때 가장 중요한 것은 뭐라고 생각해요?", category: "직무/작업" },
   { q: "기숙사 세탁기는 여러 명이 함께 쓰는데 사용 후 어떻게 관리해야 할까요?", tail: "동료가 바로 쓸 수 있게 세탁기 주변을 어떻게 정리해 둘 거예요?", category: "안전/기숙사" },
   { q: "출퇴근 시간과 작업 시작 시간을 잘 지키는 것이 왜 중요할까요?", tail: "지각하지 않으려면 아침에 시간을 어떻게 관리할 거예요?", category: "직무/작업" },
-  { q: "가스 용접이나 절단 후 퇴근할 때 가스 밸브를 꼭 잠가야 하는 이유가 뭘까요?", tail: "밸브를 잠그고 나서 가스가 새지 않는지 어떻게 확인할 수 있어요?", category: "직무/작업" }
+  { q: "가스 용접이나 절단 후 퇴근할 때 가스 밸브를 꼭 잠가야 하는 이유가 뭘까요?", tail: "밸브를 잠그고 나서 가스가 새지 않는지 어떻게 확인할 수 있어요?", category: "직무/작업" },
+  { q: "새로운 기계나 장비 사용법을 모를 때는 어떻게 배울 거예요?", tail: "설명을 들은 뒤 안전하게 다루기 위해 무엇을 연습할 거예요?", category: "직무/작업" },
+  { q: "회사 동료가 일에 쫓겨서 힘들어하면 어떻게 도와줄 거예요?", tail: "동료를 돕기 전에 내 작업 상황은 어떻게 확인할 거예요?", category: "직무/작업" },
+  { q: "한국 회사에서 몇 년 동안 일하고 싶어요?", tail: "계약 기간 동안 결근 없이 성실하게 일할 수 있어요?", category: "신상/기초" },
+  { q: "동료와 작업 방식이 달라서 의견 차이가 생기면 어떻게 대화로 풀 거예요?", tail: "대화로 안 풀리면 반장님께 어떻게 상의드릴 거예요?", category: "직무/작업" },
+  { q: "철판을 용접할 때 튼튼하고 곧게 붙이려면 어떤 점에 신경 써야 해요?", tail: "작업 중에 불꽃이나 연기가 많이 나면 어떻게 환기해요?", category: "직무/작업" },
+  { q: "그라인더로 쇠를 다듬을 때 불꽃과 파편을 막기 위해 무엇을 착용해야 해요?", tail: "보안경이 뿌옇게 흐려지면 어떻게 닦아서 쓸 거예요?", category: "안전/기숙사" },
+  { q: "용접 불똥이 신발 안으로 들어가면 아주 뜨거운데 어떻게 방지할 수 있어요?", tail: "각반이나 안전화를 어떻게 단단히 착용해야 할까요?", category: "직무/작업" },
+  { q: "산소통이나 아세틸렌 가스통을 넘어지지 않게 묶어두어야 하는 이유가 뭘까요?", tail: "가스 호스에 손상된 부분이 없는지 어떻게 점검해요?", category: "직무/작업" },
+  { q: "헐렁한 옷을 입고 회전하는 기계 옆에서 일하면 왜 위험할까요?", tail: "작업복 소매와 밑단을 어떻게 정리하고 일할 거예요?", category: "안전/기숙사" },
+  { q: "작업 끝나고 공구를 바닥에 두고 그냥 가면 다음 날 어떤 문제가 생길까요?", tail: "퇴근 전 5분 동안 공구 정리는 어떻게 진행할 거예요?", category: "직무/작업" },
+  { q: "기숙사에서 다른 룸메이트의 물건을 말없이 빌려 쓰면 왜 안 될까요?", tail: "꼭 필요한 물건이 있을 때는 어떻게 정중하게 양해를 구할 거예요?", category: "안전/기숙사" },
+  { q: "세탁기 안에 다른 사람 빨래가 먼저 들어있으면 어떻게 행동할 거예요?", tail: "빨래가 끝난 동료의 옷은 어떻게 배려해서 꺼내둘 수 있어요?", category: "안전/기숙사" },
+  { q: "쉬는 시간이 끝나서 알림 벨이 울리면 바로 작업 위치로 가야 하는 이유가 뭐예요?", tail: "작업 흐름이 끊기지 않게 하려면 쉬는 시간을 어떻게 관리해야 할까요?", category: "직무/작업" },
+  { q: "여름철 더운 야외나 선체 안에서 일할 때 탈수를 막으려면 어떻게 해야 해요?", tail: "어지럼증이 느껴지면 하던 일을 멈추고 어떻게 조치할 거예요?", category: "안전/기숙사" },
+  { q: "철판을 조립하거나 맞출 때 틈새가 벌어지지 않게 어떻게 고정해야 해요?", tail: "가접(가용접)을 할 때 주의할 점은 무엇인가요?", category: "직무/작업" },
+  { q: "안전화 앞부분에 단단한 쇠가 들어있는 이유를 알고 있나요?", tail: "무거운 자재가 발 위로 떨어지는 것을 막으려면 왜 항상 신어야 할까요?", category: "안전/기숙사" },
+  { q: "기숙사 주방에서 요리하고 가스 불을 끄는 것을 잊어버리지 않으려면 어떻게 해요?", tail: "조리가 끝난 뒤 주방 주변은 어떻게 정리정돈할 거예요?", category: "안전/기숙사" },
+  { q: "오후 식사 후 일하다가 졸음이 오면 안전사고를 막기 위해 어떻게 잠을 깰 거예요?", tail: "동료가 졸고 있는 것을 보면 어떻게 안전하게 깨워줄 거예요?", category: "직무/작업" },
+  { q: "한국인 동료가 퇴근 후 함께 저녁 식사를 하자고 하면 어떻게 할 거예요?", tail: "한국 동료들과 친해지기 위해 어떤 대화를 나누고 싶어요?", category: "신상/기초" },
+  { q: "작업 현장에 불이 쉽게 붙는 종이나 기름 묻은 걸레가 있으면 왜 즉시 치워야 할까요?", tail: "인화성 쓰레기는 어느 전용 쓰레기통에 버려야 안전한가요?", category: "안전/기숙사" },
+  { q: "한국 조선소에 대해 평소에 어떤 이야기를 들어보았나요?", tail: "현대삼호중공업에서 세계적인 큰 배를 직접 만들어보고 싶나요?", category: "직무/작업" },
+  { q: "사다리에 올라갈 때 왜 한 손이 아니라 두 손으로 안전하게 잡고 올라가야 해요?", tail: "사다리가 흔들리지 않게 밑에서 동료가 어떻게 잡아줘야 할까요?", category: "안전/기숙사" }
 ];
 
-// 3. 고급 (Advanced): 복문 구사, 상황 판단, 문제 해결, 갈등 관리, 긴급 비상 대응, 공정 이해
+// 4. 고급 (Advanced): 복문 구사, 상황 판단, 문제 해결, 갈등 관리, 긴급 비상 대응, 공정 이해 (40개 이상의 문항 풀)
 export const QUESTIONS_POOL_ADVANCED: QuestionItem[] = [
   { q: "이전 직장에서 배웠던 기술 중에서 가장 자신 있는 작업이나 용접 자세는 무엇인가요?", tail: "그 작업을 할 때 품질을 좋게 유지하는 본인만의 방법이 있어요?", category: "직무/작업" },
   { q: "동료와 작업하는 방식이나 의견이 달라서 다툼이나 갈등이 생기면 어떻게 해결할 거예요?", tail: "대화로 해결하기 어려우면 누구에게 도움을 요청할 거예요?", category: "심층/상황" },
@@ -105,57 +191,126 @@ export const QUESTIONS_POOL_ADVANCED: QuestionItem[] = [
   { q: "한국인 동료 및 다양한 국적의 외국인 동료들과 언어와 문화가 다를 텐데 원활하게 협력하기 위해 어떤 노력을 할 건가요?", tail: "문화나 말이 달라서 오해가 생기면 어떻게 풀 거예요?", category: "심층/상황" },
   { q: "안전모나 보안경, 안전대 같은 안전 보호구에 균열이 가거나 훼손된 것을 발견했을 때 임시로 테이프를 감아서 쓰면 안 되는 이유가 무엇인가요?", tail: "망가진 보호구를 그냥 쓰고 일하면 왜 위험할까요?", category: "안전/기숙사" },
   { q: "비계나 족장 위 같은 높은 고소 작업에서 일할 때 안전고리를 왜 반드시 2중으로 걸어야 하고 바닥으로 공구를 떨어뜨리지 않으려면 어떻게 해야 할까요?", tail: "높은 곳에서 움직일 때 안전고리를 어떻게 걸어야 하는지 알고 있어요?", category: "안전/기숙사" },
-  { q: "한국 현대삼호중공업에 입사하여 계약 기간 동안 어떤 목표와 태도로 일하여 회사에 기여하고 싶나요?", tail: "앞으로 한국에서 기술을 배워서 이루고 싶은 꿈은 무엇인가요?", category: "심층/상황" }
+  { q: "한국 현대삼호중공업에 입사하여 계약 기간 동안 어떤 목표와 태도로 일하여 회사에 기여하고 싶나요?", tail: "앞으로 한국에서 기술을 배워서 이루고 싶은 꿈은 무엇인가요?", category: "심층/상황" },
+  { q: "선체 블록을 조립할 때 취부 치수가 도면과 오차가 생기면 무리하게 힘으로 당겨서 붙이면 안 되는 이유가 뭘까요?", tail: "치수 오차가 발생했을 때 반장님이나 검사관에게 어떻게 보고해야 할까요?", category: "직무/작업" },
+  { q: "CO2 용접이나 아크 용접을 할 때 바람이 많이 불면 가스 보호막이 날아가는데 어떻게 대처해야 할까요?", tail: "바람막이 차폐막을 설치하는 방법과 중요성을 설명할 수 있나요?", category: "직무/작업" },
+  { q: "용접 모재 표면에 녹, 기름, 페인트, 수분이 묻어있으면 용접 품질에 어떤 치명적인 불량이 생기나요?", tail: "용접을 시작하기 전에 그라인더나 와이어 브러시로 어떻게 청소해야 할까요?", category: "직무/작업" },
+  { q: "작업장에 유독 가스 냄새가 나거나 산소 농도가 부족하다고 느껴질 때 긴급 대피 절차는 어떻게 되나요?", tail: "동료들에게 위험을 알리고 가스 밸브를 차단할 때 주의할 점은 무엇인가요?", category: "안전/기숙사" },
+  { q: "고소 작업대(렌탈/스카이)나 크레인 바스켓에 탑승할 때 안전벨트 체결과 적정 하중 준수가 왜 필수적인가요?", tail: "작업대 위에서 무리하게 몸을 밖으로 내밀면 안 되는 이유가 무엇인가요?", category: "안전/기숙사" },
+  { q: "협력업체 동료가 위험한 방식으로 작업하는 것을 목격했을 때 작업 중지 권한을 요청하거나 조언할 수 있나요?", tail: "기분 나쁘지 않게 안전 수칙을 지키도록 어떻게 설득할 건가요?", category: "심층/상황" },
+  { q: "야간 작업이나 잔업이 연속으로 이어져 체력적으로 지칠 때 작업 집중력을 유지하기 위해 무엇을 관리하나요?", tail: "피로로 인한 안전사고를 방지하기 위해 휴식 시간에 어떻게 대처할 건가요?", category: "심층/상황" },
+  { q: "용접 작업 후 슬래그를 털어낼 때 파편이 눈이나 얼굴로 튀지 않게 하려면 어떤 보호구를 써야 하나요?", tail: "슬래그 제거 망치(치핑 해머)를 올바르게 사용하는 방법은 무엇인가요?", category: "직무/작업" },
+  { q: "두꺼운 강판을 용접할 때 예열과 후열 관리가 용접부 균열 방지에 왜 중요한지 알고 있나요?", tail: "온도 체크 크레용이나 온도계를 어떻게 확인해야 할까요?", category: "직무/작업" },
+  { q: "선박 건조 현장에서 화재 감시자의 역할과 비상벨 위치 확인이 왜 중요한지 설명해 줄 수 있나요?", tail: "화재 감시자가 자리를 비우면 왜 즉시 용접 작업을 중단해야 할까요?", category: "안전/기숙사" },
+  { q: "내가 만든 용접 비드가 비파괴 검사(RT/UT)나 외관 검사에서 불합격 판정을 받는다면 어떻게 대처할 건가요?", tail: "불량 원인을 분석하고 다음 작업에서 통과하기 위해 어떤 기술적 보완을 할 건가요?", category: "심층/상황" },
+  { q: "동료 근로자가 기숙사 공동 규칙을 계속 어기고 비협조적으로 나온다면 팀 분위기를 위해 어떻게 소통할 건가요?", tail: "갈등이 심해지기 전에 관리자나 반장님께 중재를 요청하는 바람직한 방법은 무엇인가요?", category: "심층/상황" },
+  { q: "작업 중 손가락 협착이나 발등 낙하 충격을 받았을 때 통증을 숨기지 않고 바로 보고해야 하는 이유가 뭘까요?", tail: "초기 응급처치를 신속하게 받는 것이 후유증 예방에 왜 중요한가요?", category: "안전/기숙사" },
+  { q: "한국의 기업 문화에서 근태(출결, 작업 시간 준수)와 약속 이행이 신뢰에 미치는 영향을 어떻게 생각하나요?", tail: "성실한 근무 태도를 증명하기 위해 평소 어떤 행동 습관을 지킬 건가요?", category: "심층/상황" },
+  { q: "전기 용접 홀더나 케이블 피복이 벗겨진 것을 발견했을 때 즉시 전기 스위치를 내리고 교체해야 하는 이유는 무엇인가요?", tail: "누전 차단기가 정상 작동하는지 테스트 버튼으로 어떻게 확인하나요?", category: "직무/작업" },
+  { q: "용접기와 발전기를 정지할 때 주 전원 스위치와 가스 공급 라인을 차단하는 올바른 셧다운 절차를 알고 있나요?", tail: "작업 종료 후 남은 불씨가 없는지 30분 이상 확인해야 하는 이유는 무엇인가요?", category: "안전/기숙사" }
 ];
 
-// Helper: 인원별(수험번호, 이름, E-9 여부) 난이도별 10문항씩 고유 배정 생성 함수
+// 고품질 셔플 및 난수 분산 함수 (SplitMix32 기반 고유 시드 분산 + Fisher-Yates)
+function splitmix32(a: number) {
+  return function() {
+    a |= 0;
+    a = (a + 0x9e3779b9) | 0;
+    let t = a ^ (a >>> 16);
+    t = Math.imul(t, 0x21f0aaad);
+    t = t ^ (t >>> 15);
+    t = Math.imul(t, 0x735a2d97);
+    return ((t = t ^ (t >>> 15)) >>> 0) / 4294967296;
+  };
+}
+
+function stringToSeed(str: string): number {
+  let hash = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    hash = Math.imul(hash ^ code, 3432918353);
+    hash = (hash << 13) | (hash >>> 19);
+  }
+  return hash >>> 0;
+}
+
+export function shuffleArray<T>(array: T[], prng?: () => number): T[] {
+  const result = [...array];
+  const rand = prng || Math.random;
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+// 인원별(수험번호, 이름, E-9 여부, 난수 시드) 난이도별 10문항씩(초급 10 / 중급 10 / 고급 10 = 총 30문항) 고유 배정 생성 함수
 export function generateCandidateQuestions(candidate: {
   app_no?: string;
   name?: string;
   e9?: string;
+  seed?: number | string;
 }): {
   basic: QuestionItem[];
   intermediate: QuestionItem[];
   advanced: QuestionItem[];
 } {
   const isE9 = candidate?.e9 === 'O' || candidate?.e9 === 'o' || candidate?.e9 === 'Y' || candidate?.e9 === 'y';
-  const seedKey = `${candidate?.app_no || ''}_${candidate?.name || ''}`;
   
-  // 간단한 시드 해시 함수 (인원별 고유하지만 일관된 셔플 결과 보장)
-  let seed = 0;
-  for (let i = 0; i < seedKey.length; i++) {
-    seed = (seed * 31 + seedKey.charCodeAt(i)) & 0xffffffff;
-  }
-  seed = Math.abs(seed);
+  // 고유 시드 키 생성 (응시번호 + 성명 + 시드)
+  const seedKey = `${candidate?.app_no || ''}__${candidate?.name || ''}__${candidate?.seed || ''}`;
+  const baseSeed = stringToSeed(seedKey);
 
-  const seededShuffle = (arr: QuestionItem[], salt: number) => {
-    const copy = [...arr];
-    let localSeed = (seed + salt) >>> 0;
-    for (let i = copy.length - 1; i > 0; i--) {
-      localSeed = (localSeed * 1664525 + 1013904223) >>> 0;
-      const j = localSeed % (i + 1);
-      [copy[i], copy[j]] = [copy[j], copy[i]];
+  // 로컬 스토리지에 저장된 관리자 신규 생성 문항이 있다면 풀에 통합
+  let customItems: QuestionItem[] = [];
+  try {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('hd_custom_questions');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          customItems = parsed.map((itemStr: string) => {
+            const parts = itemStr.replace(/^\[신규\]\s*/, '').split('→');
+            const mainQ = (parts[0] || itemStr).trim();
+            const tailQ = (parts[1] || '').trim();
+            return {
+              q: mainQ,
+              tail: tailQ || undefined,
+              category: '직무/작업' as const
+            };
+          });
+        }
+      }
     }
-    return copy;
-  };
+  } catch (e) {
+    console.warn('Custom questions loading exception', e);
+  }
+
+  // PRNG 인스턴스 생성 (초급, 중급, 고급별 서로 다른 솔트 적용하여 독립적 분산)
+  const basicPrng = splitmix32(baseSeed ^ 0x1a2b3c4d);
+  const intermediatePrng = splitmix32(baseSeed ^ 0x5e6f7a8b);
+  const advancedPrng = splitmix32(baseSeed ^ 0x9c0d1e2f);
 
   // 1. 초급 10문항 배정
   let basicItems: QuestionItem[] = [];
+  const fullBasicPool = [...QUESTIONS_POOL_BASIC, ...customItems.filter((_, i) => i % 3 === 0)];
+  
   if (isE9) {
-    // E-9 유경험자의 경우 초급 10문항 중 상위 5문항은 E-9 전용 필수 정보 취득 질문 고정 배정
-    const e9Base = [...E9_DEFAULT_QUESTIONS];
-    const shuffledGeneralBasic = seededShuffle(QUESTIONS_POOL_BASIC, 101);
-    // 남은 5개는 일반 초급 질문에서 채움
-    basicItems = [...e9Base, ...shuffledGeneralBasic.slice(0, 5)];
+    // E-9 근로자는 E-9 전용 풀 12+문항 중 5문항 + 일반 초급 풀에서 5문항 셔플 배정
+    const e9Prng = splitmix32(baseSeed ^ 0xe9e9e9e9);
+    const shuffledE9 = shuffleArray(E9_DEFAULT_QUESTIONS, e9Prng);
+    const shuffledBasic = shuffleArray(fullBasicPool, basicPrng);
+    basicItems = [...shuffledE9.slice(0, 5), ...shuffledBasic.slice(0, 5)];
   } else {
-    basicItems = seededShuffle(QUESTIONS_POOL_BASIC, 101).slice(0, 10);
+    basicItems = shuffleArray(fullBasicPool, basicPrng).slice(0, 10);
   }
 
-  // 2. 중급 10문항 배정
-  const intermediateItems = seededShuffle(QUESTIONS_POOL_INTERMEDIATE, 202).slice(0, 10);
+  // 2. 중급 10문항 배정 (45+ 문항 풀에서 10문항 선별)
+  const fullInterPool = [...QUESTIONS_POOL_INTERMEDIATE, ...customItems.filter((_, i) => i % 3 === 1)];
+  const intermediateItems = shuffleArray(fullInterPool, intermediatePrng).slice(0, 10);
 
-  // 3. 고급 10문항 배정
-  const advancedItems = seededShuffle(QUESTIONS_POOL_ADVANCED, 303).slice(0, 10);
+  // 3. 고급 10문항 배정 (40+ 문항 풀에서 10문항 선별)
+  const fullAdvPool = [...QUESTIONS_POOL_ADVANCED, ...customItems.filter((_, i) => i % 3 === 2)];
+  const advancedItems = shuffleArray(fullAdvPool, advancedPrng).slice(0, 10);
 
   return {
     basic: basicItems,

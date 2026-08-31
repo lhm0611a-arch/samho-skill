@@ -1,5 +1,5 @@
-// High-Fidelity AI Voice TTS Engine (Male Interviewer Dedicated)
-// Uses High-Definition Audio TTS with persistent server disk caching and male-only fallback safety.
+// Ultra-Realistic Korean Human Voice TTS Engine
+// Uses state-of-the-art Korean neural announcer voices with persistent disk caching.
 
 const audioCache = new Map<string, HTMLAudioElement>();
 
@@ -8,30 +8,28 @@ let currentAudio: HTMLAudioElement | null = null;
 let activeFetchController: AbortController | null = null;
 let currentPlaybackId = 0;
 
-// Male & Female AI Interviewer Voices:
-// 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 표준 면접관 - 기본)
-// 'Charon': 👨 AI 남성 2 (신뢰감 있고 중후한 면접관)
-// 'Puck': 👨 AI 남성 3 (친근하고 자연스러운 면접관)
-// 'Aoede': 👩 AI 여성 1 (단정하고 부드러운 면접관)
-// 'Kore': 👩 AI 여성 2 (또렷하고 밝은 면접관)
-export type TTSVoiceType = 'Fenrir' | 'Charon' | 'Puck' | 'Aoede' | 'Kore';
+// Korean Male Interviewer Voices:
+// 'InJoon': 👨 한국인 남성 1 (인준 - 사람 아나운서처럼 자연스럽고 또렷한 표준음)
+// 'Hyunsu': 👨 한국인 남성 2 (현수 - 신뢰감 있고 차분한 중저음 대화톤)
+export type TTSVoiceType = 'InJoon' | 'Hyunsu' | 'Fenrir' | 'Charon';
 
-const VALID_VOICES: TTSVoiceType[] = ['Fenrir', 'Charon', 'Puck', 'Aoede', 'Kore'];
+const VALID_VOICES: TTSVoiceType[] = ['InJoon', 'Hyunsu', 'Fenrir', 'Charon'];
 
 let currentVoice: TTSVoiceType = typeof window !== 'undefined' 
   ? (() => {
       const saved = localStorage.getItem('hd_tts_voice') as TTSVoiceType;
+      if (saved === 'Charon' || saved === 'Hyunsu') return 'Hyunsu';
       if (VALID_VOICES.includes(saved)) return saved;
-      return 'Fenrir';
+      return 'InJoon';
     })()
-  : 'Fenrir';
+  : 'InJoon';
 
 export function setTTSVoice(voice: TTSVoiceType | string) {
-  let normalized: TTSVoiceType = 'Fenrir';
-  if (VALID_VOICES.includes(voice as TTSVoiceType)) {
-    normalized = voice as TTSVoiceType;
+  let normalized: TTSVoiceType = 'InJoon';
+  if (voice === 'Charon' || voice === 'Hyunsu') {
+    normalized = 'Hyunsu';
   } else {
-    normalized = 'Fenrir';
+    normalized = 'InJoon';
   }
 
   currentVoice = normalized;
@@ -198,7 +196,7 @@ export function speakText(
   let cancelled = false;
   const isStale = () => cancelled || playbackId !== currentPlaybackId;
 
-  const cacheKey = `v6_gemini_${voiceTarget}_${cleanText}`;
+  const cacheKey = `v8_ultra_human_korean_${voiceTarget}_${cleanText}`;
 
   // 1. Check client-side audio memory cache first
   if (audioCache.has(cacheKey)) {
@@ -342,11 +340,11 @@ function playFallbackBrowserSpeech(
     }
 
     if (isExplicitMale) {
-      utterance.rate = voiceTarget === 'Fenrir' ? 0.95 : 0.92;
-      utterance.pitch = voiceTarget === 'Fenrir' ? 0.92 : 0.85;
+      utterance.rate = (voiceTarget === 'Charon' || voiceTarget === 'Hyunsu') ? 0.92 : 0.95;
+      utterance.pitch = (voiceTarget === 'Charon' || voiceTarget === 'Hyunsu') ? 0.85 : 0.92;
     } else {
       utterance.rate = 0.90;
-      utterance.pitch = voiceTarget === 'Fenrir' ? 0.72 : 0.65;
+      utterance.pitch = (voiceTarget === 'Charon' || voiceTarget === 'Hyunsu') ? 0.65 : 0.72;
     }
 
     utterance.onstart = () => {
@@ -384,7 +382,7 @@ function playFallbackBrowserSpeech(
 export function preloadTTS(text: string, voice?: TTSVoiceType) {
   const targetVoice = voice || currentVoice;
   const cleanText = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
-  const cacheKey = `v3_${targetVoice}_${cleanText}`;
+  const cacheKey = `v8_ultra_human_korean_${targetVoice}_${cleanText}`;
   
   if (audioCache.has(cacheKey)) return;
 

@@ -367,10 +367,6 @@ export function normalizeDate(raw: any): string {
   return s;
 }
 
-export function formatYYYYMMDD(str: string): string {
-  return normalizeDate(str);
-}
-
 export function getSkillGradeByScore(val: number): string {
   if (!val || val === 0) return '-';
   if (val >= 91) return "S";

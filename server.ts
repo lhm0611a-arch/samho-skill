@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -12,12 +13,30 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Lazy GoogleGenAI client initialization
+let aiClient: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI {
+  if (!aiClient) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('GEMINI_API_KEY environment variable is required');
+    }
+    aiClient = new GoogleGenAI({ apiKey: key });
+  }
+  return aiClient;
+}
 
 // Persistent Server Audio Cache Directory
 const CACHE_DIR = path.join(process.cwd(), 'server_cache', 'audio');
 if (!fs.existsSync(CACHE_DIR)) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+// Clean text key with question mark formatting for choice questions
+function cleanTtsText(text: string): string {
+  let cleaned = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
+  cleaned = cleaned.replace(/([가-힣]+(?:어요|아요|여요|에요|예요|나요|까요|지요|죠|있나요|없나요|됩니까|합니까)),(\s*)([가-힣]+)/g, '$1?$2$3');
+  return cleaned;
 }
 
 // In-Memory index of cached audio
@@ -138,10 +157,11 @@ app.post('/api/generate-questions', async (req, res) => {
 난이도는 한국어능력시험(TOPIK) 1급 수준으로 아주 쉽고 명확하게 질문해 주세요.
 반드시 각 질문은 한 줄로 작성하되, 하나의 핵심 질문 뒤에 꼬리 질문을 '→' 로 이어주세요.
 질문 앞에는 "[신규]" 라는 말머리를 꼭 붙여주세요.
+[중요]: 둘 중 하나를 고르는 양자 택일 형태의 질문(예: ~했어요? ~했어요?, ~좋아요? ~좋아요?, 첫째예요? 막내예요?)은 중간 쉼표(,) 대신 반드시 물음표(?)를 각각 넣어주세요. (예: '버스를 탔어요? 걸어왔어요?', '첫째예요? 막내예요?')
 
 예시:
 [신규] 오늘 아침에 몇 시에 일어났어요? → 일어나서 제일 먼저 무엇을 했어요?
-[신규] 고향에서 가장 유명한 것은 무엇인가요? → 왜 그것이 유명해요?
+[신규] 오늘 면접장에 올 때 버스를 탔어요? 걸어왔어요? → 오는데 시간이 얼마나 걸렸어요?
 [신규] 용접을 할 때 제일 중요한 것이 무엇이라고 생각해요? → 불이 나면 어떻게 해요?
 
 총 ${count}개의 질문만 반환해주세요.`;
@@ -149,9 +169,10 @@ app.post('/api/generate-questions', async (req, res) => {
     let response;
     let retries = 3;
     let delay = 2000;
+    const aiInstance = getAI();
     while (retries > 0) {
       try {
-        response = await ai.models.generateContent({
+        response = await aiInstance.models.generateContent({
           model: 'gemini-3.7-flash',
           contents: prompt,
         });
@@ -186,8 +207,8 @@ app.post('/api/tts', async (req, res) => {
       return res.status(400).json({ error: 'Text parameter is required.' });
     }
 
-    // Clean text key
-    const cleanKey = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
+    // Clean text key with question mark formatting for choice questions
+    const cleanKey = cleanTtsText(text);
     
     // Normalize voice selection to Male voices:
     // 'Fenrir': 👨 AI 남성 1 (차분하고 또렷한 면접관 - 기본)
@@ -269,7 +290,7 @@ app.post('/api/tts', async (req, res) => {
 
 async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolean> {
   try {
-    const cleanKey = text.replace(/\[신규\]/g, '').replace(/→/g, ' 그리고 ').replace(/\s+/g, ' ').trim();
+    const cleanKey = cleanTtsText(text);
     if (!cleanKey) return false;
 
     const cacheVersion = 'v3_crisp_male';
@@ -303,20 +324,24 @@ async function ensureAudioCached(text: string, voice = 'Fenrir'): Promise<boolea
 
 // Background audio warmup for all questions in database
 async function startAudioWarmup() {
-  console.log('[TTS Pre-warm] Starting background audio pre-caching for all question sets...');
-  const allQuestions: string[] = [];
-  for (const set of QUESTIONS_DB) {
-    for (const q of set) {
-      if (!allQuestions.includes(q)) allQuestions.push(q);
+  try {
+    console.log('[TTS Pre-warm] Starting background audio pre-caching for all question sets...');
+    const allQuestions: string[] = [];
+    for (const set of QUESTIONS_DB) {
+      for (const q of set) {
+        if (!allQuestions.includes(q)) allQuestions.push(q);
+      }
     }
-  }
 
-  // Pre-warm primarily for Fenrir (default) and Charon
-  for (const q of allQuestions) {
-    await ensureAudioCached(q, 'Fenrir');
-    await new Promise(r => setTimeout(r, 80)); // polite throttle
+    // Pre-warm primarily for Fenrir (default) and Charon
+    for (const q of allQuestions) {
+      await ensureAudioCached(q, 'Fenrir');
+      await new Promise(r => setTimeout(r, 80)); // polite throttle
+    }
+    console.log(`[TTS Pre-warm] Completed caching for Fenrir (${serverTtsIndex.size} total audios ready).`);
+  } catch (err: any) {
+    console.warn('[TTS Pre-warm] Background warmup encountered error (continuing normally):', err?.message || err);
   }
-  console.log(`[TTS Pre-warm] Completed caching for Fenrir (${serverTtsIndex.size} total audios ready).`);
 }
 
 // TTS Cache Status API (for monitoring)

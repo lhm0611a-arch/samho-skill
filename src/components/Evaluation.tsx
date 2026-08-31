@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
 import {
-  QUESTIONS_DB,
   CRITERIA,
   SCORES_10,
   SCORES_20,
@@ -40,7 +39,6 @@ import {
   getSkillGradeByScore,
   getBadgeHtml,
   normalizeType,
-  formatYYYYMMDD,
   normalizeDate,
   calculateAge,
   normalizeDob,
@@ -249,16 +247,6 @@ export default function Evaluation() {
     }
     return kVals;
   }
-
-  // Sync candidate selection (keep filter controls intact so all candidates remain visible)
-  useEffect(() => {
-    if (selectedUid) {
-      const c = candidates.find((item) => item.uid === selectedUid);
-      if (c) {
-        // Never auto-lock filterDate to candidate's eval_date to avoid hiding unevaluated candidates
-      }
-    }
-  }, [selectedUid, candidates]);
 
   // Helper to reliably resolve evaluation date
   const getCandidateDate = (c: any): string => {
@@ -595,7 +583,7 @@ export default function Evaluation() {
     const effectiveEvaluator = (evaluatorName && evaluatorName.trim() !== '') ? evaluatorName.trim() : (userRole === 'admin' ? 'Admin' : '평가위원');
     
     // Update evaluation date to today (or candidate's custom selected date if any)
-    const todayStr = formatYYYYMMDD(new Date().toISOString());
+    const todayStr = normalizeDate(new Date().toISOString());
     p.eval_date = todayStr;
     p.eval_type = normalizeType(p.eval_type);
 

@@ -2,11 +2,11 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   SlidersHorizontal, 
-  Search, 
+  Search,
   Languages, 
   Hammer, 
   ClipboardCheck, 
-  Filter, 
+  Filter,
   X, 
   Zap, 
   ArrowUpDown, 

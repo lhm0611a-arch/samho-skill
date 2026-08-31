@@ -129,6 +129,26 @@ async function fetchServerTTSAudio(text: string, voice: TTSVoiceType, signal: Ab
 }
 
 /**
+ * Format and normalize question text for natural speech
+ * Converts choice clauses with comma into question marks to ensure interrogative intonation
+ * e.g., "버스를 탔어요, 걸어왔어요?" -> "버스를 탔어요? 걸어왔어요?"
+ */
+export function formatQuestionSpeechText(text: string): string {
+  let cleaned = text
+    .replace(/\[신규\]/g, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/→/g, ' 그리고 ')
+    .replace(/[()（）]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 양자 택일 질문에서 중간 쉼표를 물음표로 변환하여 평서문 어조 방지
+  cleaned = cleaned.replace(/([가-힣]+(?:어요|아요|여요|에요|예요|나요|까요|지요|죠|있나요|없나요|됩니까|합니까)),(\s*)([가-힣]+)/g, '$1?$2$3');
+
+  return cleaned;
+}
+
+/**
  * Speak text with clear, crisp, natural Korean voice
  */
 export function speakText(
@@ -145,14 +165,8 @@ export function speakText(
 
   const voiceTarget = voiceOverride || currentVoice;
 
-  // Clean text: remove [신규] tags, convert arrows, remove parentheses/brackets smoothly
-  const cleanText = text
-    .replace(/\[신규\]/g, '')
-    .replace(/\[[^\]]*\]/g, '')
-    .replace(/→/g, ' 그리고 ')
-    .replace(/[()（）]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // Clean text and apply natural speech intonation formatting
+  const cleanText = formatQuestionSpeechText(text);
 
   if (!cleanText) {
     callbacks?.onEnd?.();

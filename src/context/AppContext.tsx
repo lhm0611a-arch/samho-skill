@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Candidate, Log, UserRole, ViewType } from '../types';
 import { 
   normalizeType, 
-  formatYYYYMMDD, 
   normalizeDate,
   getKoreanGrade, 
   getKoreanPassText, 

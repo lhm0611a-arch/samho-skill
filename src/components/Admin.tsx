@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Database, Upload, Download, RefreshCw, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code, Code2, Copy, FileDown, Check } from 'lucide-react';
+import { Database, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code2, Copy, FileDown, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as XLSX from 'xlsx';
 import { 
@@ -15,8 +15,7 @@ import {
   calculateAge, 
   normalizeE9, 
   normalizeType, 
-  normalizeDate,
-  formatYYYYMMDD 
+  normalizeDate 
 } from '../lib/utils';
 
 export default function Admin() {

@@ -65,7 +65,7 @@ export function HdHyundaiCiLogo({ className = "h-9" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
       <img 
-        src="/ci.png" 
+        src="/ci1.png" 
         alt="HD현대삼호" 
         className="h-full w-auto object-contain max-h-12" 
         onError={(e) => {
@@ -94,21 +94,23 @@ export default function ExecutiveReport() {
   // 1. Report Assessment Type Filter: 'all' | '본기량검증' | '사전기량검증'
   const [reportType, setReportType] = useState<'all' | '본기량검증' | '사전기량검증'>('all');
 
-  // 2. Multi-date selection state
+  // 2. Multi-date selection state (Applied state & Temp draft state for confirmation)
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [tempSelectedDates, setTempSelectedDates] = useState<string[]>([]);
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
 
-  // 3. Multi-agency selection state
+  // 3. Multi-agency selection state (Applied state & Temp draft state for confirmation)
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
+  const [tempSelectedAgencies, setTempSelectedAgencies] = useState<string[]>([]);
   const [isAgencyMenuOpen, setIsAgencyMenuOpen] = useState(false);
   const agencyDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedJob, setSelectedJob] = useState<string>('all');
 
-  // 4. Report Mode Toggle: Details (with appendix)
-  const [includeDetails, setIncludeDetails] = useState<boolean>(false);
+  // 4. Report Mode Toggle: Details (with appendix) - Default: true (세부 명단 기본 포함)
+  const [includeDetails, setIncludeDetails] = useState<boolean>(true);
 
-  // 5. Report Cover Page Toggle: Cover Page on/off
+  // 5. Report Cover Page Toggle: Cover Page on/off - Default: true (표지 기본 포함)
   const [includeCover, setIncludeCover] = useState<boolean>(true);
 
   // 6. Report Issue Date
@@ -221,9 +223,9 @@ export default function ExecutiveReport() {
     return Array.from(set).sort();
   }, [candidatesByType]);
 
-  // Toggle individual date selection
-  const toggleDate = (date: string) => {
-    setSelectedDates(prev => {
+  // Toggle individual temp date selection
+  const toggleTempDate = (date: string) => {
+    setTempSelectedDates(prev => {
       if (prev.includes(date)) {
         return prev.filter(d => d !== date);
       } else {
@@ -232,15 +234,33 @@ export default function ExecutiveReport() {
     });
   };
 
-  // Toggle individual agency selection
-  const toggleAgency = (agency: string) => {
-    setSelectedAgencies(prev => {
+  const applyDateSelection = () => {
+    setSelectedDates(tempSelectedDates);
+    setIsDateMenuOpen(false);
+  };
+
+  const cancelDateSelection = () => {
+    setIsDateMenuOpen(false);
+  };
+
+  // Toggle individual temp agency selection
+  const toggleTempAgency = (agency: string) => {
+    setTempSelectedAgencies(prev => {
       if (prev.includes(agency)) {
         return prev.filter(a => a !== agency);
       } else {
         return [...prev, agency];
       }
     });
+  };
+
+  const applyAgencySelection = () => {
+    setSelectedAgencies(tempSelectedAgencies);
+    setIsAgencyMenuOpen(false);
+  };
+
+  const cancelAgencySelection = () => {
+    setIsAgencyMenuOpen(false);
   };
 
   // Filtered candidate list based on all selected dimensions
@@ -986,7 +1006,13 @@ export default function ExecutiveReport() {
             {/* 2. Multi-date Selector */}
             <div className="relative" ref={dateDropdownRef}>
               <button
-                onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
+                onClick={() => {
+                  if (!isDateMenuOpen) {
+                    setTempSelectedDates(selectedDates);
+                    setIsAgencyMenuOpen(false);
+                  }
+                  setIsDateMenuOpen(!isDateMenuOpen);
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                   selectedDates.length > 0 
                     ? 'bg-blue-900/60 border-blue-500 text-blue-200' 
@@ -1005,33 +1031,44 @@ export default function ExecutiveReport() {
               </button>
 
               {isDateMenuOpen && (
-                <div className="absolute right-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-2 text-slate-200 text-xs">
+                <div className="absolute right-0 mt-1 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-3 text-slate-200 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-700 px-1">
                     <span className="font-bold text-white flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-400" /> 일자 다중 선택
+                      <Calendar className="w-3.5 h-3.5 text-emerald-400" /> 일자 선택
                     </span>
-                    <button 
-                      onClick={() => setSelectedDates([])}
-                      className="text-[11px] text-blue-400 hover:underline font-semibold"
-                    >
-                      전체 기간 선택
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setTempSelectedDates(dateList)}
+                        className="text-[11px] text-emerald-400 hover:underline font-semibold"
+                      >
+                        전체 선택
+                      </button>
+                      <span className="text-slate-600">|</span>
+                      <button 
+                        type="button"
+                        onClick={() => setTempSelectedDates([])}
+                        className="text-[11px] text-slate-400 hover:underline font-semibold"
+                      >
+                        해제
+                      </button>
+                    </div>
                   </div>
-                  <div className="max-h-56 overflow-y-auto py-1 space-y-1">
+                  <div className="max-h-56 overflow-y-auto py-1.5 space-y-1 my-1">
                     {dateListWithCount.map(({ date, count }) => {
-                      const isSelected = selectedDates.includes(date);
+                      const isChecked = tempSelectedDates.includes(date);
                       return (
                         <label 
                           key={date}
-                          className={`flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                            isSelected ? 'bg-blue-600/30 text-white font-bold' : 'hover:bg-slate-700/60 text-slate-300'
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                            isChecked ? 'bg-blue-600/30 text-white font-bold border border-blue-500/50' : 'hover:bg-slate-700/60 text-slate-300'
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             <input 
                               type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleDate(date)}
+                              checked={isChecked}
+                              onChange={() => toggleTempDate(date)}
                               className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
                             />
                             <span>{date}</span>
@@ -1043,6 +1080,27 @@ export default function ExecutiveReport() {
                       );
                     })}
                   </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700 px-1">
+                    <span className="text-[11px] text-slate-400">
+                      {tempSelectedDates.length === 0 ? '전체 기간' : `${tempSelectedDates.length}개 일자 선택`}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={cancelDateSelection}
+                        className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-semibold text-[11px] transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyDateSelection}
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-[11px] shadow-xs transition-colors"
+                      >
+                        확인 (적용)
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1050,7 +1108,13 @@ export default function ExecutiveReport() {
             {/* 3. Multi-Agency Selector */}
             <div className="relative" ref={agencyDropdownRef}>
               <button
-                onClick={() => setIsAgencyMenuOpen(!isAgencyMenuOpen)}
+                onClick={() => {
+                  if (!isAgencyMenuOpen) {
+                    setTempSelectedAgencies(selectedAgencies);
+                    setIsDateMenuOpen(false);
+                  }
+                  setIsAgencyMenuOpen(!isAgencyMenuOpen);
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                   selectedAgencies.length > 0 
                     ? 'bg-blue-900/60 border-blue-500 text-blue-200' 
@@ -1069,33 +1133,44 @@ export default function ExecutiveReport() {
               </button>
 
               {isAgencyMenuOpen && (
-                <div className="absolute right-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-2 text-slate-200 text-xs">
+                <div className="absolute right-0 mt-1 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-3 text-slate-200 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-700 px-1">
                     <span className="font-bold text-white flex items-center gap-1">
-                      <Building className="w-3.5 h-3.5 text-blue-400" /> 협력사 다중 선택
+                      <Building className="w-3.5 h-3.5 text-blue-400" /> 협력사 선택
                     </span>
-                    <button 
-                      onClick={() => setSelectedAgencies([])}
-                      className="text-[11px] text-blue-400 hover:underline font-semibold"
-                    >
-                      전체 협력사 선택
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setTempSelectedAgencies(agencyList)}
+                        className="text-[11px] text-emerald-400 hover:underline font-semibold"
+                      >
+                        전체 선택
+                      </button>
+                      <span className="text-slate-600">|</span>
+                      <button 
+                        type="button"
+                        onClick={() => setTempSelectedAgencies([])}
+                        className="text-[11px] text-slate-400 hover:underline font-semibold"
+                      >
+                        해제
+                      </button>
+                    </div>
                   </div>
-                  <div className="max-h-56 overflow-y-auto py-1 space-y-1">
+                  <div className="max-h-56 overflow-y-auto py-1.5 space-y-1 my-1">
                     {agencyListWithCount.map(({ agency, count }) => {
-                      const isSelected = selectedAgencies.includes(agency);
+                      const isChecked = tempSelectedAgencies.includes(agency);
                       return (
                         <label 
                           key={agency}
-                          className={`flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                            isSelected ? 'bg-blue-600/30 text-white font-bold' : 'hover:bg-slate-700/60 text-slate-300'
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                            isChecked ? 'bg-blue-600/30 text-white font-bold border border-blue-500/50' : 'hover:bg-slate-700/60 text-slate-300'
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             <input 
                               type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleAgency(agency)}
+                              checked={isChecked}
+                              onChange={() => toggleTempAgency(agency)}
                               className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
                             />
                             <span className="truncate">{agency}</span>
@@ -1107,36 +1182,57 @@ export default function ExecutiveReport() {
                       );
                     })}
                   </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700 px-1">
+                    <span className="text-[11px] text-slate-400">
+                      {tempSelectedAgencies.length === 0 ? '전체 협력사' : `${tempSelectedAgencies.length}개사 선택`}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={cancelAgencySelection}
+                        className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-semibold text-[11px] transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyAgencySelection}
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-[11px] shadow-xs transition-colors"
+                      >
+                        확인 (적용)
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* 4. Cover Page Toggle */}
+            {/* 4. Cover Page Toggle (Default: Included, Click to Skip) */}
             <button
               onClick={() => setIncludeCover(!includeCover)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                 includeCover 
-                  ? 'bg-blue-600/30 border-blue-500 text-blue-200' 
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                  ? 'bg-blue-900/50 border-blue-500 text-blue-200 hover:bg-blue-900/80 shadow-2xs' 
+                  : 'bg-slate-800/80 border-red-500/40 text-slate-400 line-through decoration-red-400 hover:text-white'
               }`}
-              title="보고서 표지(Cover Page) 포함 여부"
+              title={includeCover ? '클릭 시 보고서 표지를 제외(SKIP)합니다' : '클릭 시 보고서 표지를 다시 포함합니다'}
             >
-              <FileText className="w-3.5 h-3.5" />
-              <span>{includeCover ? '📄 표지 포함' : '📄 표지 제외'}</span>
+              <FileText className={`w-3.5 h-3.5 ${includeCover ? 'text-blue-400' : 'text-slate-500'}`} />
+              <span>{includeCover ? '📄 표지 제외 (출력 중)' : '📄 표지 SKIP됨 (포함하기)'}</span>
             </button>
 
-            {/* 5. Report Mode Toggle (Summary vs Full Report with Attachment) */}
+            {/* 5. Report Mode Toggle: Detailed Appendix (Default: Included, Click to Skip) */}
             <button
               onClick={() => setIncludeDetails(!includeDetails)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                 includeDetails 
-                  ? 'bg-amber-600/30 border-amber-500 text-amber-200' 
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                  ? 'bg-amber-900/50 border-amber-500 text-amber-200 hover:bg-amber-900/80 shadow-2xs' 
+                  : 'bg-slate-800/80 border-red-500/40 text-slate-400 line-through decoration-red-400 hover:text-white'
               }`}
-              title="요약 보고서 또는 개인별 세부 명단 별첨 포함 여부"
+              title={includeDetails ? '클릭 시 개인별 세부 명단을 제외(SKIP)합니다' : '클릭 시 개인별 세부 명단을 다시 포함합니다'}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>{includeDetails ? '📑 세부 명단(별첨) 포함' : '📄 요약 보고서'}</span>
+              <FileSpreadsheet className={`w-3.5 h-3.5 ${includeDetails ? 'text-amber-400' : 'text-slate-500'}`} />
+              <span>{includeDetails ? '📑 세부 명단 제외 (출력 중)' : '📑 세부 명단 SKIP됨 (포함하기)'}</span>
             </button>
 
             {/* Print Button */}
@@ -1331,9 +1427,9 @@ export default function ExecutiveReport() {
                     </span>
                   )}
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200 text-center flex flex-col justify-center items-center min-h-[68px] overflow-hidden">
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-center flex flex-col justify-center items-center min-h-[68px]">
                   <span className="text-slate-500 font-bold block text-xs whitespace-nowrap">대상 협력사</span>
-                  <div className="text-slate-900 text-[11px] sm:text-xs mt-1 leading-snug flex flex-wrap justify-center items-center gap-x-1 gap-y-0.5 max-h-[44px] overflow-y-auto" title={agencyDisplay}>
+                  <div className="text-slate-900 text-[11px] sm:text-xs mt-1 leading-snug flex flex-wrap justify-center items-center gap-x-1 gap-y-0.5" title={agencyDisplay}>
                     {activeAgencyList.map((ag, idx) => (
                       <span key={ag} className="font-extrabold inline-block whitespace-nowrap">
                         {ag}{idx < activeAgencyList.length - 1 ? ',' : ''}
@@ -1347,7 +1443,7 @@ export default function ExecutiveReport() {
                     {selectedJob === 'all' ? '용접 및 취부' : selectedJob}
                   </span>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200 text-center flex flex-col justify-center items-center min-h-[68px] overflow-hidden">
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-center flex flex-col justify-center items-center min-h-[68px]">
                   <span className="text-slate-500 font-bold block text-xs whitespace-nowrap">합격 판정 기준</span>
                   <span className="font-extrabold text-blue-900 text-[11px] sm:text-[11.5px] mt-1 block break-keep leading-snug">
                     {reportInfo.criteriaDesc}

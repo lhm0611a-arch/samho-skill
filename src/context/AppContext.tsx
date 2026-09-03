@@ -187,7 +187,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const candName = normalizeName(d.name);
         const job = normalizeJob(d.job);
         let dob = normalizeDob(d.dob);
-        const e9 = normalizeE9(d.e9);
+        const rawE9 = d.e9 ?? d['E-9'] ?? d['e-9'] ?? d.e_9 ?? d['e9_exp'] ?? d['E-9출신여부'] ?? d['E-9 여부'] ?? d['E-9_출신여부'] ?? d['비자'] ?? d.visa;
+        const e9 = normalizeE9(rawE9);
         let age = calculateAge(dob);
         if (age === 0 && d.age) {
           const parsedAge = parseInt(String(d.age).replace(/[^0-9]/g, ''), 10);

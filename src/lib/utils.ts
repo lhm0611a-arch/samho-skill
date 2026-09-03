@@ -285,10 +285,24 @@ export function calculateAge(dobStr: string, refDate: Date = new Date()): number
 export function normalizeE9(raw: any): string {
   if (raw === undefined || raw === null) return 'X';
   const s = String(raw).toUpperCase().trim();
-  if (['O', '0', 'YES', 'Y', 'TRUE', '○', '유', '1'].some(k => s === k || s.includes(k))) {
+  if (['O', '0', 'YES', 'Y', 'TRUE', '○', '유', '1', 'E-9', 'E9'].some(k => s === k || s.includes(k))) {
     return 'O';
   }
   return 'X';
+}
+
+/**
+ * E-9 비자 경력자 여부 정확 판별 (O, ○, Y, YES, TRUE, 1, 유, E-9 등 모든 형태 지원)
+ */
+export function isE9Candidate(c: any): boolean {
+  if (!c) return false;
+  const raw = c.e9 ?? c.e_9 ?? c['E-9'] ?? c['e-9'] ?? c.e9_exp ?? c.e9Exp ?? c['E-9출신여부'] ?? c['E-9 여부'] ?? c['E-9_출신여부'] ?? c['비자'] ?? c.visa;
+  if (raw === undefined || raw === null) return false;
+  const s = String(raw).toUpperCase().trim();
+  if (!s || s === 'X' || s === 'N' || s === 'NO' || s === 'FALSE' || s === '무' || s === '-' || s === '0') return false;
+  if (s === 'O' || s === '○' || s === 'Y' || s === 'YES' || s === 'TRUE' || s === '1' || s === '유' || s === '예') return true;
+  if (s.includes('E-9') || s.includes('E9') || s.includes('경력') || s.includes('유') || s.includes('O') || s.includes('○')) return true;
+  return false;
 }
 
 export function normalizeDate(raw: any): string {

@@ -372,15 +372,26 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Excel Download Button placed directly to the right in the same line */}
-            <button 
-              onClick={exportToCSV} 
-              className="bg-slate-700 hover:bg-slate-600 text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 border border-slate-600 shrink-0 justify-center whitespace-nowrap ml-auto"
-              title="필터링된 평가 결과 CSV 파일 다운로드"
-            >
-              <Download className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>엑셀 다운로드</span>
-            </button>
+            {/* Action Buttons: Executive Report & Excel Download */}
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              <button 
+                onClick={() => setCurrentView('report')} 
+                className="bg-emerald-700 hover:bg-emerald-600 text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-bold transition-all shadow-md flex items-center gap-1.5 border border-emerald-600 shrink-0 justify-center whitespace-nowrap"
+                title="HD현대삼호 공식 총괄 보고서 (PDF/인쇄) 생성 및 출력"
+              >
+                <FileText className="w-4 h-4 text-emerald-200 shrink-0" />
+                <span>총괄 보고서 발행</span>
+              </button>
+              
+              <button 
+                onClick={exportToCSV} 
+                className="bg-slate-700 hover:bg-slate-600 text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 border border-slate-600 shrink-0 justify-center whitespace-nowrap"
+                title="필터링된 평가 결과 CSV 파일 다운로드"
+              >
+                <Download className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>엑셀 다운로드</span>
+              </button>
+            </div>
           </div>
         </div>
 

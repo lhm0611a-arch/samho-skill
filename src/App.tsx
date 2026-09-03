@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Evaluation from './components/Evaluation';
 import Admin from './components/Admin';
+import ExecutiveReport from './components/ExecutiveReport';
 
 function MainApp() {
   const { userRole, currentView } = useAppContext();
@@ -20,6 +21,7 @@ function MainApp() {
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'evaluation' && <Evaluation />}
         {currentView === 'admin' && <Admin />}
+        {currentView === 'report' && <ExecutiveReport />}
       </main>
     </div>
   );

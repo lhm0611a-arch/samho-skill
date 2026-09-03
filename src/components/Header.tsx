@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, ClipboardList, Database, RefreshCw, Settings, Power, HardHat, Shield } from 'lucide-react';
+import { PieChart, ClipboardList, Database, RefreshCw, Settings, Power, HardHat, Shield, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { hashPassword } from '../lib/utils';
 
@@ -76,6 +76,13 @@ export default function Header() {
           >
             <ClipboardList className="w-3.5 h-3.5 hidden sm:inline shrink-0" />
             <span>평가하기</span>
+          </button>
+          <button 
+            onClick={() => setCurrentView('report')}
+            className={`px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 text-[11px] sm:text-xs md:text-sm font-bold flex items-center justify-center gap-1 sm:gap-1.5 rounded-md transition-all whitespace-nowrap shrink-0 ${currentView === 'report' ? 'bg-hd-green text-white shadow-sm' : 'text-gray-300 hover:text-white hover:bg-white/10'}`}
+          >
+            <FileText className="w-3.5 h-3.5 hidden sm:inline shrink-0" />
+            <span>총괄 보고서</span>
           </button>
           {userRole === 'admin' && (
             <button 

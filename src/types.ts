@@ -45,4 +45,4 @@ export interface Log {
 
 export type UserRole = 'admin' | 'evaluator' | 'interviewer' | null;
 
-export type ViewType = 'dashboard' | 'evaluation' | 'admin';
+export type ViewType = 'dashboard' | 'evaluation' | 'admin' | 'report';

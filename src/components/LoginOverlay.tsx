@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Settings, X, Shield, Lock, User, Terminal, QrCode } from 'lucide-react';
+import { ArrowRight, Settings, X, Shield, Lock, User, Terminal } from 'lucide-react';
 import { hashPassword } from '../lib/utils';
 import { useAppContext } from '../context/AppContext';
 
@@ -74,11 +74,6 @@ export default function LoginOverlay() {
             {showAdmin ? <X className="w-3 h-3" /> : <Settings className="w-3 h-3" />} 
             {showAdmin ? "입력 취소" : "SYS_ADMIN"}
           </button>
-          {!showAdmin && (
-            <button className="px-2.5 py-1 rounded text-[10px] text-cyan-300 font-bold flex items-center gap-1.5 hover:bg-cyan-900/30 transition-all border border-cyan-900">
-              <QrCode className="w-3 h-3" /> QR_LINK
-            </button>
-          )}
         </div>
 
         {/* Top Center Pill Badge */}

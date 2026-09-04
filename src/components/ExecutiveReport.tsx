@@ -1888,7 +1888,13 @@ export default function ExecutiveReport() {
                 <div className="text-slate-700 space-y-1.5 text-[12.5px] sm:text-[13.5px] leading-snug break-keep">
                   <div className="flex items-start gap-1.5">
                     <span className="text-blue-700 font-bold shrink-0">•</span>
-                    <span><strong>실기 기량(용접·취부):</strong> 용접 평균 <strong>{stats.avgWeld}점</strong>(통과 {stats.weldPassCount}명 / {stats.weldPassRate}%), 취부 평균 <strong>{stats.avgFit > 0 ? `${stats.avgFit}점` : '해당직종'}</strong>(통과 {stats.fitPassCount}명)으로 현장 표준 작업 기준을 충족함.</span>
+                    {stats.weldTotal > 0 && stats.fitTotal > 0 ? (
+                      <span><strong>실기 기량(용접·취부):</strong> 전체 실기 통과 <strong>{stats.skillPassCount}명({stats.skillPassRate}%)</strong> — 용접 응시 {stats.weldTotal}명 중 <strong>{stats.weldPassCount}명 통과(통과율 {stats.weldPassRate}%, 평균 {stats.avgWeld}점)</strong>, 취부 응시 {stats.fitTotal}명 중 <strong>{stats.fitPassCount}명 통과(통과율 {stats.fitPassRate}%, 평균 {stats.avgFit}점)</strong>로 현장 표준 작업 기준을 충족함.</span>
+                    ) : stats.fitTotal > 0 ? (
+                      <span><strong>실기 기량(취부):</strong> 취부 응시 {stats.fitTotal}명 중 <strong>{stats.fitPassCount}명 통과(통과율 {stats.fitPassRate}%, 평균 {stats.avgFit}점)</strong>로 현장 표준 작업 기준을 충족함.</span>
+                    ) : (
+                      <span><strong>실기 기량(용접):</strong> 용접 응시 {stats.weldTotal}명 중 <strong>{stats.weldPassCount}명 통과(통과율 {stats.weldPassRate}%, 평균 {stats.avgWeld}점)</strong>로 현장 표준 작업 기준을 충족함.</span>
+                    )}
                   </div>
                   <div className="flex items-start gap-1.5">
                     <span className="text-purple-700 font-bold shrink-0">•</span>
@@ -1965,7 +1971,15 @@ export default function ExecutiveReport() {
 
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
                     <div className="text-[13px] sm:text-[13.5px] leading-snug text-slate-800">
-                      <strong className="text-blue-950 font-black">분야별 기량 현황:</strong> 용접 평균 <strong className="text-blue-900 font-extrabold">{stats.avgWeld}점</strong> (통과율 {stats.weldPassRate}%), 취부 평균 <strong className="text-blue-900 font-extrabold">{stats.avgFit > 0 ? `${stats.avgFit}점` : '해당직종'}</strong>, 한국어 구술 평균 <strong className="text-purple-900 font-extrabold">{stats.avgKorean}점</strong>
+                      <strong className="text-blue-950 font-black">분야별 기량 현황:</strong>{' '}
+                      {stats.weldTotal > 0 && (
+                        <span>용접 평균 <strong className="text-blue-900 font-extrabold">{stats.avgWeld}점</strong> (응시 {stats.weldTotal}명 중 통과 {stats.weldPassCount}명, {stats.weldPassRate}%)</span>
+                      )}
+                      {stats.weldTotal > 0 && stats.fitTotal > 0 && <span>, </span>}
+                      {stats.fitTotal > 0 && (
+                        <span>취부 평균 <strong className="text-blue-900 font-extrabold">{stats.avgFit > 0 ? `${stats.avgFit}점` : '-'}</strong> (응시 {stats.fitTotal}명 중 통과 {stats.fitPassCount}명, {stats.fitPassRate}%)</span>
+                      )}
+                      <span>, 한국어 구술 평균 <strong className="text-purple-900 font-extrabold">{stats.avgKorean}점</strong></span>
                     </div>
                   </div>
                 </div>

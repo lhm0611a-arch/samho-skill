@@ -1,9 +1,43 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
 @import "tailwindcss";
 
+/* HD Hyundai Corporate Custom Fonts (Auto-loads when uploaded to /public/fonts/ or /public/) */
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Light OTF.otf') format('opentype'),
+       url('/fonts/HD-Light.otf') format('opentype'),
+       url('/HD-Light OTF.otf') format('opentype'),
+       url('/HD-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Medium OTF.otf') format('opentype'),
+       url('/fonts/HD-Medium.otf') format('opentype'),
+       url('/HD-Medium OTF.otf') format('opentype'),
+       url('/HD-Medium.otf') format('opentype');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Bold OTF.otf') format('opentype'),
+       url('/fonts/HD-Bold.otf') format('opentype'),
+       url('/HD-Bold OTF.otf') format('opentype'),
+       url('/HD-Bold.otf') format('opentype');
+  font-weight: 700 800 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: 'Noto Sans KR', ui-sans-serif, system-ui, sans-serif;
-  --font-kor: 'Noto Sans KR', sans-serif;
+  --font-sans: 'HD Hyundai', 'Noto Sans KR', ui-sans-serif, system-ui, sans-serif;
+  --font-kor: 'HD Hyundai', 'Noto Sans KR', sans-serif;
   
   /* HD Hyundai Official Colors */
   --color-hd-navy: #002c5f;
@@ -14,7 +48,7 @@
   body {
     background-color: #030f1c;
     color: #e2e8f0;
-    font-family: 'Noto Sans KR', sans-serif;
+    font-family: 'HD Hyundai', 'Noto Sans KR', sans-serif;
     -webkit-font-smoothing: antialiased;
     font-size: 16px;
   }
@@ -25,9 +59,9 @@
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  .font-kor { font-family: 'Noto Sans KR', sans-serif; }
-  .font-eng { font-family: 'Noto Sans KR', sans-serif; }
-  .font-tech { font-family: 'Noto Sans KR', sans-serif; }
+  .font-kor { font-family: 'HD Hyundai', 'Noto Sans KR', sans-serif; }
+  .font-eng { font-family: 'HD Hyundai', 'Noto Sans KR', sans-serif; }
+  .font-tech { font-family: 'HD Hyundai', 'Noto Sans KR', sans-serif; }
 
   /* Enterprise Cards */
   .dx-card, .hud-card {

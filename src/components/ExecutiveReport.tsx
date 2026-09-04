@@ -358,13 +358,54 @@ export default function ExecutiveReport() {
     return activeAgencyList.join(', ');
   }, [activeAgencyList]);
 
-  // Country short display mapping (베트남, 인니, 우즈벡, 태국 등 축약 및 표준화)
-  const normalizeCountryShort = (raw: string | undefined): string => {
+  // Dynamic Job List derived from current filteredCandidates (e.g., 용접, 선각취부, 의장취부)
+  const candidateJobsSummary = useMemo(() => {
+    const jobOrder = ['용접', '선각취부', '의장취부'];
+    const foundJobs: string[] = [];
+
+    // Check occurrences of standard jobs or distinct job strings in filteredCandidates
+    const hasJob = (keyword: string) => filteredCandidates.some(c => (c.job || '').includes(keyword));
+
+    const hasWeld = hasJob('용접') || filteredCandidates.some(c => Number(c.s_score_weld) > 0);
+    const hasHullFit = hasJob('선각');
+    const hasOutfittingFit = hasJob('의장');
+    const hasGenericFit = hasJob('취부') && !hasHullFit && !hasOutfittingFit;
+
+    if (hasWeld) foundJobs.push('용접');
+    if (hasHullFit) foundJobs.push('선각취부');
+    if (hasOutfittingFit) foundJobs.push('의장취부');
+    if (hasGenericFit) foundJobs.push('취부');
+
+    // If candidate list had other customized job names not matching the above
+    filteredCandidates.forEach(c => {
+      const j = (c.job || '').trim();
+      if (j && !foundJobs.includes(j) && !j.includes('용접') && !j.includes('취부')) {
+        foundJobs.push(j);
+      }
+    });
+
+    if (foundJobs.length === 0) {
+      return {
+        list: ['용접'],
+        display: '용접',
+        summaryText: '용접'
+      };
+    }
+
+    return {
+      list: foundJobs,
+      display: `${foundJobs.join(', ')} (총 ${foundJobs.length}개 직종)`,
+      summaryText: foundJobs.join(', ')
+    };
+  }, [filteredCandidates]);
+
+  // Country full name display mapping (인도네시아, 베트남, 우즈베키스탄, 태국 등 정식 명칭 표준화)
+  const normalizeCountry = (raw: string | undefined): string => {
     if (!raw) return '';
     const s = raw.trim();
-    if (/인도네시아|Indonesia|인니/i.test(s)) return '인니';
+    if (/인도네시아|Indonesia|인니/i.test(s)) return '인도네시아';
     if (/베트남|Vietnam/i.test(s)) return '베트남';
-    if (/우즈베키스탄|Uzbekistan|우즈벡/i.test(s)) return '우즈벡';
+    if (/우즈베키스탄|Uzbekistan|우즈벡/i.test(s)) return '우즈베키스탄';
     if (/태국|타이|Thailand/i.test(s)) return '태국';
     if (/스리랑카|Sri\s*Lanka/i.test(s)) return '스리랑카';
     if (/필리핀|Philippines/i.test(s)) return '필리핀';
@@ -380,7 +421,7 @@ export default function ExecutiveReport() {
   const countryList = useMemo(() => {
     const set = new Set<string>();
     filteredCandidates.forEach(c => {
-      const formatted = normalizeCountryShort(c.country);
+      const formatted = normalizeCountry(c.country);
       if (formatted) set.add(formatted);
     });
     // Fallback: if candidate data does not have country, check candidate eval_type or agency hints
@@ -1067,7 +1108,7 @@ export default function ExecutiveReport() {
 
     passedCandidates.forEach(c => {
       const ag = (c.agency || '기타').trim() || '기타';
-      const ctry = normalizeCountryShort(c.country) || '베트남';
+      const ctry = normalizeCountry(c.country) || '베트남';
       if (!map.has(ag)) {
         map.set(ag, {
           agency: ag,
@@ -1607,7 +1648,7 @@ export default function ExecutiveReport() {
                 <HdHyundaiCiLogo className="h-12" />
                 <div className="flex items-center gap-2.5">
                   <span className="text-xs font-extrabold bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded tracking-wider">
-                    사내 대외비
+                    대외비
                   </span>
                   <span className={`text-xs font-extrabold px-3.5 py-1.5 rounded border ${reportInfo.badgeColor}`}>
                     {reportInfo.badge}
@@ -1631,7 +1672,7 @@ export default function ExecutiveReport() {
               <div className="w-28 h-1.5 bg-gradient-to-r from-[#002c5f] via-[#00a859] to-[#002c5f] mx-auto rounded-full"></div>
 
               <p className="text-sm text-slate-600 max-w-xl mx-auto font-medium leading-relaxed">
-                조선업 현장 맞춤형 외국인 기능인력의 <strong className="text-slate-900 font-bold">실기 기량(용접, 취부)</strong> 및 <strong className="text-slate-900 font-bold">한국어 말하기 평가</strong>를 종합 검증하여 최적의 생산 투입 인력을 선발한 결과 보고서입니다.
+                조선업 현장 맞춤형 외국인 기능인력의 <strong className="text-slate-900 font-bold">실기 기량({candidateJobsSummary.summaryText})</strong> 및 <strong className="text-slate-900 font-bold">한국어 말하기 평가</strong>를 종합 검증하여 최적의 생산 투입 인력을 선발한 결과 보고서입니다.
               </p>
 
               {/* Cover Metadata Overview Table (Clean, Centered, Spacious & High-Readability) */}
@@ -1650,8 +1691,8 @@ export default function ExecutiveReport() {
                       <th className="bg-slate-100 text-slate-800 font-bold py-3 px-4 text-center border-r border-slate-200">
                         검증 직종
                       </th>
-                      <td className="py-3 px-4 text-center font-semibold text-slate-900">
-                        용접 (CO2 / FCAW) 및 취부 (선체 조립)
+                      <td className="py-3 px-4 text-center font-bold text-slate-900">
+                        {candidateJobsSummary.display}
                       </td>
                     </tr>
                     <tr className="border-b border-slate-200">
@@ -1750,7 +1791,7 @@ export default function ExecutiveReport() {
               <HdHyundaiCiLogo className="h-10" />
               <div className="flex items-center gap-2">
                 <span className="text-xs font-extrabold bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded tracking-wider">
-                  사내 대외비
+                  대외비
                 </span>
                 <span className={`text-xs font-extrabold px-2.5 py-1 rounded border ${reportInfo.badgeColor}`}>
                   {reportInfo.badge}
@@ -1833,15 +1874,15 @@ export default function ExecutiveReport() {
                 <CheckCircle2 className="w-4 h-4 text-blue-700" /> II. 종합 판정 요약
               </h3>
 
-              {/* Verdict Callout - Objective Fact-based Summary */}
-              <div className="p-3.5 bg-blue-50/90 border-l-4 border-blue-700 rounded-r-lg text-xs sm:text-[13px] leading-relaxed text-slate-800 space-y-2">
-                <div className="font-black text-blue-950 flex items-center justify-between text-sm">
+              {/* Verdict Callout - Objective Fact-based Summary with Enhanced Font Size & Readability */}
+              <div className="p-4 bg-blue-50/90 border-l-4 border-blue-700 rounded-r-lg text-[13px] sm:text-[14px] leading-relaxed text-slate-800 space-y-2.5">
+                <div className="font-black text-blue-950 flex items-center justify-between text-[14.5px] sm:text-[15px]">
                   <span className="flex items-center gap-1.5">📌 종합 선발 판정 결과:</span>
-                  <span className="text-emerald-700 font-black bg-emerald-100/80 px-2.5 py-0.5 rounded border border-emerald-300">
+                  <span className="text-emerald-800 font-black bg-emerald-100/90 px-3 py-0.5 rounded border border-emerald-300 text-[13.5px]">
                     총 {stats.total}명 중 가용 인력 {stats.passTotalCount}명 확보 ({stats.passTotalRate}%)
                   </span>
                 </div>
-                <div className="text-slate-700 space-y-1 text-xs sm:text-[13px] leading-relaxed break-keep">
+                <div className="text-slate-700 space-y-1.5 text-[12.5px] sm:text-[13.5px] leading-snug break-keep">
                   <div className="flex items-start gap-1.5">
                     <span className="text-blue-700 font-bold shrink-0">•</span>
                     <span><strong>실기 기량(용접·취부):</strong> 용접 평균 <strong>{stats.avgWeld}점</strong>(통과 {stats.weldPassCount}명 / {stats.weldPassRate}%), 취부 평균 <strong>{stats.avgFit > 0 ? `${stats.avgFit}점` : '해당직종'}</strong>(통과 {stats.fitPassCount}명)으로 현장 표준 작업 기준을 충족함.</span>
@@ -1919,14 +1960,9 @@ export default function ExecutiveReport() {
                     <Bar data={skillBarData} options={skillBarOptions} plugins={[barDataLabelsPlugin]} />
                   </div>
 
-                  <div className="text-xs text-slate-700 bg-white p-2 rounded-lg border border-slate-200 leading-relaxed space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                      <span>우수 기량(S·A): <strong className="text-blue-900">{stats.skillGrades.S + stats.skillGrades.A}명</strong> ({Math.round(((stats.skillGrades.S + stats.skillGrades.A) / (stats.total || 1)) * 100)}%)</span>
-                      <span>양호(B): <strong className="text-blue-700">{stats.skillGrades.B}명</strong> ({Math.round((stats.skillGrades.B / (stats.total || 1)) * 100)}%)</span>
-                      <span>보완(C·D): <strong className="text-purple-900">{stats.skillGrades.C + stats.skillGrades.D}명</strong> ({Math.round(((stats.skillGrades.C + stats.skillGrades.D) / (stats.total || 1)) * 100)}%)</span>
-                    </div>
-                    <div className="text-[11.5px] leading-tight text-slate-700">
-                      <strong className="text-slate-900">분야별 기량 현황:</strong> 용접 평균 <strong>{stats.avgWeld}점</strong> (통과율 {stats.weldPassRate}%), 취부 평균 <strong>{stats.avgFit > 0 ? `${stats.avgFit}점` : '해당직종'}</strong>, 한국어 구술 평균 <strong>{stats.avgKorean}점</strong>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                    <div className="text-[13px] sm:text-[13.5px] leading-snug text-slate-800">
+                      <strong className="text-blue-950 font-black">분야별 기량 현황:</strong> 용접 평균 <strong className="text-blue-900 font-extrabold">{stats.avgWeld}점</strong> (통과율 {stats.weldPassRate}%), 취부 평균 <strong className="text-blue-900 font-extrabold">{stats.avgFit > 0 ? `${stats.avgFit}점` : '해당직종'}</strong>, 한국어 구술 평균 <strong className="text-purple-900 font-extrabold">{stats.avgKorean}점</strong>
                     </div>
                   </div>
                 </div>
@@ -1939,70 +1975,70 @@ export default function ExecutiveReport() {
                 <h3 className="text-sm sm:text-[15px] font-black text-[#002c5f] flex items-center gap-2">
                   <Layers className="w-4 h-4 text-blue-700" /> IV. 직종 및 단계별 합격 판정 기준
                 </h3>
-                <span className="text-[10.5px] text-slate-500 font-medium">조선협회 & HD현대삼호 평가 표준</span>
+                <span className="text-[11px] text-slate-500 font-medium">조선협회 & HD현대삼호 평가 표준</span>
               </div>
               
               <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                <table className="w-full table-fixed text-center text-xs border-collapse">
+                <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                   <thead>
                     <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                      <th rowSpan={2} className="py-1 px-1 border-r border-slate-300 w-[15%] whitespace-nowrap align-middle">검증 단계</th>
-                      <th colSpan={2} className="py-0.5 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[11px]">
+                      <th rowSpan={2} className="py-2 px-1 border-r border-slate-300 w-[16%] whitespace-nowrap align-middle">검증 단계</th>
+                      <th colSpan={2} className="py-1 px-1 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[12px]">
                         실기 기량 검증 기준
                       </th>
-                      <th colSpan={2} className="py-0.5 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[11px]">
+                      <th colSpan={2} className="py-1 px-1 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[12px]">
                         한국어 구술(말하기) 평가 기준
                       </th>
-                      <th rowSpan={2} className="py-1 px-1 bg-slate-200/70 font-black text-slate-900 w-[19%] align-middle">
+                      <th rowSpan={2} className="py-2 px-1 bg-slate-200/70 font-black text-slate-900 w-[19%] align-middle">
                         판정 결과 및 조치
                       </th>
                     </tr>
-                    <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[10.5px]">
-                      <th className="py-0.5 px-0.5 border-r border-slate-300 w-[16%]">용접 실기</th>
-                      <th className="py-0.5 px-0.5 border-r border-slate-300 w-[16%]">선각 취부 실기</th>
-                      <th className="py-0.5 px-0.5 border-r border-slate-300 w-[17%]">일반 합격 기준</th>
-                      <th className="py-0.5 px-0.5 border-r border-slate-300 w-[17%]">연령별 / 조건부</th>
+                    <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11.5px]">
+                      <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">용접 실기</th>
+                      <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">선각 취부 실기</th>
+                      <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">일반 합격 기준</th>
+                      <th className="py-1 px-0.5 border-r border-slate-300 w-[17%]">연령별 / 조건부</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 font-semibold text-slate-700 text-[11px]">
+                  <tbody className="divide-y divide-slate-200 font-semibold text-slate-700 text-[12px]">
                     <tr className={reportType === '사전기량검증' ? 'bg-emerald-50/40 font-bold' : ''}>
-                      <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">
+                      <td className="py-2 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 text-emerald-900 font-extrabold">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>사전 기량검증
                         </span>
                       </td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-blue-900 font-bold">C등급 (51점↑)</td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-blue-900 font-bold">C등급 (41점↑)</td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-purple-900 font-bold">50점↑ (C등급)</td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-slate-700 leading-tight">
-                        <div>40대 60↑</div>
-                        <div className="text-purple-900 font-semibold mt-0.5">20대 40~45↑</div>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-blue-900 font-bold">C등급 (51점↑)</td>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-blue-900 font-bold">C등급 (41점↑)</td>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-purple-900 font-bold">50점↑ (C등급)</td>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-slate-700 leading-tight">
+                        <div className="font-bold">40대 60↑</div>
+                        <div className="text-purple-900 font-bold mt-0.5">20대 40~45↑</div>
                       </td>
-                      <td className="py-1.5 px-1 text-slate-800 leading-tight text-[10.5px]">
+                      <td className="py-2 px-1 text-slate-800 leading-snug text-[11.5px]">
                         본검증 응시 추천<br/><span className="text-purple-800 font-medium">(20대 조건부 육성)</span>
                       </td>
                     </tr>
                     <tr className={reportType === '본기량검증' ? 'bg-blue-50/40 font-bold' : ''}>
-                      <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">
+                      <td className="py-2 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 text-blue-950 font-extrabold">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-700"></span>본 기량검증
                         </span>
                       </td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-blue-900 font-bold">B등급 (61점↑)</td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-blue-900 font-bold">B등급 (51점↑)</td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-purple-900 font-bold">60점↑ (C등급)</td>
-                      <td className="py-1.5 px-0.5 border-r border-slate-200 text-slate-700 leading-tight">
-                        <div>40대 70↑</div>
-                        <div className="text-purple-900 font-semibold mt-0.5">20대 45~50↑</div>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-blue-900 font-bold">B등급 (61점↑)</td>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-blue-900 font-bold">B등급 (51점↑)</td>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-purple-900 font-bold">60점↑ (C등급)</td>
+                      <td className="py-2 px-0.5 border-r border-slate-200 text-slate-700 leading-tight">
+                        <div className="font-bold">40대 70↑</div>
+                        <div className="text-purple-900 font-bold mt-0.5">20대 45~50↑</div>
                       </td>
-                      <td className="py-1.5 px-1 text-slate-800 font-bold leading-tight text-[11px]">
+                      <td className="py-2 px-1 text-slate-800 font-black leading-tight text-[12px]">
                         E-7 사증 신청 대상
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
+              <p className="text-[10px] text-slate-500 font-medium leading-tight">
                 ※ 실기 기량 과락자는 불합격 처리되며, 어학 성적 미달자 중 20대 청년층에 한하여 조건부 합격 기회를 부여함.
               </p>
             </div>
@@ -2032,37 +2068,37 @@ export default function ExecutiveReport() {
             </div>
 
             {/* V. 🏢 중개 업체별 합격 현황 및 기량·어학 성적 */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm sm:text-[14.5px] font-black text-[#002c5f] flex items-center gap-1.5">
+                <h3 className="text-[15px] sm:text-[15.5px] font-black text-[#002c5f] flex items-center gap-1.5">
                   <Building className="w-4 h-4 text-blue-700" /> V. 중개 업체별 합격 현황 및 기량·어학 성적
                 </h3>
-                <span className="text-[10.5px] text-slate-500 font-normal">단위: 명, 점, %</span>
+                <span className="text-[11px] text-slate-500 font-normal">단위: 명, 점, %</span>
               </div>
 
-              {/* Clean High-Contrast Table with Focused Highlights */}
+              {/* Clean High-Contrast Table with Focused Highlights and Larger Fonts */}
               <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                <table className="w-full table-fixed text-center text-xs border-collapse">
+                <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                   <thead>
-                    <tr className="bg-[#002c5f] text-white font-bold text-xs">
-                      <th className="py-1.5 px-1 text-center border-r border-blue-900/60 w-[14%] whitespace-nowrap">구분</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[11%] whitespace-nowrap">직종</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">응시인원</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">최종합격</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">조건부</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 bg-blue-900 w-[8%] whitespace-nowrap font-black">
+                    <tr className="bg-[#002c5f] text-white font-bold text-[12px]">
+                      <th className="py-2 px-1 text-center border-r border-blue-900/60 w-[14%] whitespace-nowrap">구분</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[11%] whitespace-nowrap">직종</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">응시인원</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">최종합격</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">조건부</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 bg-blue-900 w-[8.5%] whitespace-nowrap font-black">
                         합격소계
                       </th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 bg-[#001f44] w-[8.5%] font-black">
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 bg-[#001f44] w-[9%] font-black">
                         <div>선발률</div>
-                        <div className="text-[9.5px] font-normal text-slate-300 leading-tight">(%)</div>
+                        <div className="text-[10px] font-normal text-slate-300 leading-tight">(%)</div>
                       </th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[7.5%] whitespace-nowrap">불합격</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">용접평균</th>
-                      <th className="py-1.5 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">취부평균</th>
-                      <th className="py-1.5 px-0.5 text-center w-[9%]">
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[7.5%] whitespace-nowrap">불합격</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">용접평균</th>
+                      <th className="py-2 px-0.5 text-center border-r border-blue-900/60 w-[8%] whitespace-nowrap">취부평균</th>
+                      <th className="py-2 px-0.5 text-center w-[9%]">
                         <div>한국어</div>
-                        <div className="text-[9.5px] font-normal text-slate-300 leading-tight">말하기</div>
+                        <div className="text-[10px] font-normal text-slate-300 leading-tight">말하기</div>
                       </th>
                     </tr>
                   </thead>
@@ -2070,57 +2106,57 @@ export default function ExecutiveReport() {
                     {agencyStats.map((ag, idx) => (
                       <tr key={ag.name} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
                         {/* 1. Agency Name */}
-                        <td className="py-1.5 px-1 font-bold text-slate-900 text-center border-r border-slate-200 text-xs truncate overflow-hidden" title={ag.name}>
+                        <td className="py-2 px-1 font-bold text-slate-900 text-center border-r border-slate-200 text-[12.5px] truncate overflow-hidden" title={ag.name}>
                           {ag.name}
                         </td>
 
                         {/* 2. Job */}
-                        <td className="py-1.5 px-0.5 text-slate-600 text-center border-r border-slate-200 font-medium text-[11px] leading-tight break-keep overflow-hidden">
+                        <td className="py-2 px-0.5 text-slate-600 text-center border-r border-slate-200 font-medium text-[11.5px] leading-tight break-keep overflow-hidden">
                           {ag.jobs}
                         </td>
 
                         {/* 3. Total Candidates */}
-                        <td className="py-1.5 px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
                           {ag.total}명
                         </td>
 
                         {/* 4. Final / Pure Pass */}
-                        <td className="py-1.5 px-0.5 font-mono text-slate-800 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono text-slate-800 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
                           {ag.passPure}명
                         </td>
 
                         {/* 5. Conditional Pass */}
-                        <td className="py-1.5 px-0.5 font-mono text-slate-800 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono text-slate-800 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
                           {ag.passCond}명
                         </td>
 
                         {/* 6. Pass Subtotal (Highlighted) */}
-                        <td className="py-1.5 px-0.5 font-mono font-black text-[#002c5f] text-center border-r border-slate-200 bg-blue-50/50 whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono font-black text-[#002c5f] text-center border-r border-slate-200 bg-blue-50/50 whitespace-nowrap overflow-hidden">
                           {ag.passPure + ag.passCond}명
                         </td>
 
                         {/* 7. Total Pass Rate (Highlighted) */}
-                        <td className="py-1.5 px-0.5 font-mono font-black text-emerald-700 text-center border-r border-slate-200 bg-emerald-50/40 text-xs whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono font-black text-emerald-700 text-center border-r border-slate-200 bg-emerald-50/40 text-[12.5px] whitespace-nowrap overflow-hidden">
                           {ag.passTotalRate}%
                         </td>
 
                         {/* 8. Fail */}
-                        <td className={`py-1.5 px-0.5 font-mono text-center border-r border-slate-200 whitespace-nowrap overflow-hidden ${ag.fail > 0 ? 'text-slate-600' : 'text-slate-400'}`}>
+                        <td className={`py-2 px-0.5 font-mono text-center border-r border-slate-200 whitespace-nowrap overflow-hidden ${ag.fail > 0 ? 'text-slate-600' : 'text-slate-400'}`}>
                           {ag.fail}명
                         </td>
 
                         {/* 9. Weld Score Average */}
-                        <td className="py-1.5 px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
                           {ag.avgWeld > 0 ? `${ag.avgWeld}점` : '-'}
                         </td>
 
                         {/* 10. Fit Score Average */}
-                        <td className="py-1.5 px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden">
                           {ag.avgFit > 0 ? `${ag.avgFit}점` : '-'}
                         </td>
 
                         {/* 11. Korean Speaking Average */}
-                        <td className="py-1.5 px-0.5 font-mono text-slate-700 text-center whitespace-nowrap overflow-hidden">
+                        <td className="py-2 px-0.5 font-mono text-slate-700 text-center whitespace-nowrap overflow-hidden">
                           {ag.avgKorean > 0 ? `${ag.avgKorean}점` : '-'}
                         </td>
                       </tr>
@@ -2129,38 +2165,38 @@ export default function ExecutiveReport() {
 
                   {/* Summary Total Row */}
                   <tfoot>
-                    <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300 text-xs">
-                      <td className="py-1.5 px-1 text-center border-r border-slate-300 font-black whitespace-nowrap overflow-hidden">
+                    <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300 text-[12.5px]">
+                      <td className="py-2 px-1 text-center border-r border-slate-300 font-black whitespace-nowrap overflow-hidden">
                         [합계]
                       </td>
-                      <td className="py-1.5 px-0.5 text-center border-r border-slate-300 text-slate-600 font-medium whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 text-center border-r border-slate-300 text-slate-600 font-medium whitespace-nowrap overflow-hidden">
                         전 직종
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
                         {stats.total}명
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
                         {stats.passPureCount}명
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
                         {stats.passCondCount}명
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-[#002c5f] border-r border-slate-300 bg-blue-100/60 font-black whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-[#002c5f] border-r border-slate-300 bg-blue-100/60 font-black whitespace-nowrap overflow-hidden">
                         {stats.passTotalCount}명
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-emerald-800 border-r border-slate-300 bg-emerald-100/70 text-xs font-black whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-emerald-800 border-r border-slate-300 bg-emerald-100/70 text-[12.5px] font-black whitespace-nowrap overflow-hidden">
                         {stats.passTotalRate}%
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-700 border-r border-slate-300 font-medium whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-700 border-r border-slate-300 font-medium whitespace-nowrap overflow-hidden">
                         {stats.failCount}명
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
                         {stats.avgWeld}점
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden">
                         {stats.avgFit > 0 ? `${stats.avgFit}점` : '-'}
                       </td>
-                      <td className="py-1.5 px-0.5 font-mono text-center text-slate-900 font-bold whitespace-nowrap overflow-hidden">
+                      <td className="py-2 px-0.5 font-mono text-center text-slate-900 font-bold whitespace-nowrap overflow-hidden">
                         {stats.avgKorean}점
                       </td>
                     </tr>
@@ -2170,318 +2206,255 @@ export default function ExecutiveReport() {
             </div>
 
             {/* VI. 기량검증 합격자(조건부 포함) 세부 결과 */}
-            <div className="space-y-2.5 pt-0.5">
-              <div className="flex justify-between items-center border-b border-slate-200 pb-1">
-                <h3 className="text-sm sm:text-[14.5px] font-black text-[#002c5f] flex items-center gap-1.5">
+            <div className="space-y-3.5 pt-1">
+              <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                <h3 className="text-[15px] sm:text-[15.5px] font-black text-[#002c5f] flex items-center gap-1.5">
                   <BarChart3 className="w-4 h-4 text-emerald-700" /> VI. {reportType === '사전기량검증' ? '사전' : reportType === '본기량검증' ? '본' : ''} 기량검증 합격자(조건부 포함) 세부 결과
                 </h3>
-                <span className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
                   합격 인원 총 {passedAgeDetail.total}명 대상
                 </span>
               </div>
 
               {/* 1) 합격자 연령대 분포 - Full Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[12.5px] font-bold text-slate-800">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 bg-blue-700 rounded-full"></span> 1) 합격자 연령대 분포
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">단위: 명</span>
+                  <span className="text-[10.5px] text-slate-500 font-normal">단위: 명</span>
                 </div>
                 <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                  <table className="w-full table-fixed text-center text-xs border-collapse">
+                  <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">19~24세</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">25~29세</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">30~34세</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">35~39세</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[16%]">40~45세</th>
-                        <th className="py-1 px-0.5 bg-slate-200/70 font-black text-slate-900 w-[20%]">합계</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[16%]">19~24세</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[16%]">25~29세</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[16%]">30~34세</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[16%]">35~39세</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[16%]">40~45세</th>
+                        <th className="py-1.5 px-0.5 bg-slate-200/70 font-black text-slate-900 w-[20%]">합계</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
                       <tr>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedAgeDetail.g19_24}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedAgeDetail.g25_29}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200">{passedAgeDetail.g30_34}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200">{passedAgeDetail.g35_39}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200">{passedAgeDetail.g40_plus}</td>
-                        <td className="py-1 px-0.5 font-mono font-black text-emerald-900 bg-emerald-50/70">{passedAgeDetail.total}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedAgeDetail.g19_24}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedAgeDetail.g25_29}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200">{passedAgeDetail.g30_34}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200">{passedAgeDetail.g35_39}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200">{passedAgeDetail.g40_plus}</td>
+                        <td className="py-1.5 px-0.5 font-mono font-black text-emerald-900 bg-emerald-50/70">{passedAgeDetail.total}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
+                <p className="text-[10px] text-slate-500 font-medium leading-tight">
                   * 20대(19~29세) 청년층 비중 {passedAgeDetail.total > 0 ? Math.round(((passedAgeDetail.g19_24 + passedAgeDetail.g25_29) / passedAgeDetail.total) * 1000) / 10 : 0}% ({passedAgeDetail.g19_24 + passedAgeDetail.g25_29}명) 확보로 장기 근속 및 현장 적응력 우수.
                 </p>
               </div>
 
               {/* 2) 한국어 말하기 평가 등급 분포 - Full Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[12.5px] font-bold text-slate-800">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 bg-purple-700 rounded-full"></span> 2) 한국어 말하기 평가 등급 분포
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">단위: 명</span>
+                  <span className="text-[10.5px] text-slate-500 font-normal">단위: 명</span>
                 </div>
                 <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                  <table className="w-full table-fixed text-center text-xs border-collapse">
+                  <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                        <th colSpan={3} className="py-0.5 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[10.5px]">
+                        <th colSpan={3} className="py-1 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[11px]">
                           합격 기준 (A~C)
                         </th>
-                        <th colSpan={2} className="py-0.5 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[10.5px]">
+                        <th colSpan={2} className="py-1 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[11px]">
                           탈락/조건부 기준 (D~E)
                         </th>
-                        <th rowSpan={2} className="py-1 px-0.5 bg-slate-200/70 font-black text-slate-900 w-[16%] align-middle">
+                        <th rowSpan={2} className="py-1.5 px-0.5 bg-slate-200/70 font-black text-slate-900 w-[16%] align-middle">
                           합계
                         </th>
                       </tr>
-                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11px]">
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">A</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">B</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">C</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">D</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">E</th>
+                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11.5px]">
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">A</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">B</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">C</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">D</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">E</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
                       <tr>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedKoreanGradeDetail.A}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedKoreanGradeDetail.B}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedKoreanGradeDetail.C}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedKoreanGradeDetail.D}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedKoreanGradeDetail.E}</td>
-                        <td className="py-1 px-0.5 font-mono font-black text-slate-900 bg-slate-100">{passedKoreanGradeDetail.total}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedKoreanGradeDetail.A}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedKoreanGradeDetail.B}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedKoreanGradeDetail.C}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedKoreanGradeDetail.D}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedKoreanGradeDetail.E}</td>
+                        <td className="py-1.5 px-0.5 font-mono font-black text-slate-900 bg-slate-100">{passedKoreanGradeDetail.total}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
+                <p className="text-[10px] text-slate-500 font-medium leading-tight">
                   ※ 탈락 기준인 D, E 등급 중 연령 20대 인원 추가 기회(조건부 합격) 부여.
                 </p>
               </div>
 
               {/* 3) 직종별 기량 등급 (합격/조건부) - Full Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[12.5px] font-bold text-slate-800">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 bg-emerald-700 rounded-full"></span> 3) 직종별 기량 등급 (합격/조건부)
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">단위: 명</span>
+                  <span className="text-[10.5px] text-slate-500 font-normal">단위: 명</span>
                 </div>
                 <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                  <table className="w-full table-fixed text-center text-xs border-collapse">
+                  <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                        <th rowSpan={2} className="py-1 px-1 border-r border-slate-300 w-[18%] whitespace-nowrap align-middle">구분</th>
-                        <th colSpan={3} className="py-0.5 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[10.5px]">
+                        <th rowSpan={2} className="py-1.5 px-1 border-r border-slate-300 w-[18%] whitespace-nowrap align-middle">구분</th>
+                        <th colSpan={3} className="py-1 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[11px]">
                           합격 기준 (S~B)
                         </th>
-                        <th colSpan={2} className="py-0.5 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[10.5px]">
+                        <th colSpan={2} className="py-1 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[11px]">
                           탈락/조건부 기준 (C~D)
                         </th>
-                        <th rowSpan={2} className="py-1 px-1 bg-slate-200/70 font-black text-slate-900 w-[16%] align-middle">합계</th>
+                        <th rowSpan={2} className="py-1.5 px-1 bg-slate-200/70 font-black text-slate-900 w-[16%] align-middle">합계</th>
                       </tr>
-                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11px]">
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">S</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">A</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">B</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">C</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">D</th>
+                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11.5px]">
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">S</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">A</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">B</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">C</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">D</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
                       <tr>
-                        <td className="py-1 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">용접</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-blue-900">{passedSkillGradeDetail.weld.S || '-'}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.weld.A}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.weld.B}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.weld.C}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.weld.D || '-'}</td>
-                        <td className="py-1 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedSkillGradeDetail.weld.total}</td>
+                        <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">용접</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 font-bold text-blue-900">{passedSkillGradeDetail.weld.S || '-'}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.weld.A}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.weld.B}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.weld.C}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.weld.D || '-'}</td>
+                        <td className="py-1.5 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedSkillGradeDetail.weld.total}</td>
                       </tr>
                       {passedSkillGradeDetail.fit.total > 0 && (
                         <tr>
-                          <td className="py-1 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">취부</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-400">{passedSkillGradeDetail.fit.S || '-'}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.fit.A}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.fit.B}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.fit.C}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.fit.D}</td>
-                          <td className="py-1 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedSkillGradeDetail.fit.total}</td>
+                          <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">취부</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-slate-400">{passedSkillGradeDetail.fit.S || '-'}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.fit.A}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedSkillGradeDetail.fit.B}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.fit.C}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedSkillGradeDetail.fit.D}</td>
+                          <td className="py-1.5 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedSkillGradeDetail.fit.total}</td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
-                  ※ KESL은 전원 용접/선각 취부 2개 직종 수검, 코인파워는 용접 단독 수검.
+                <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                  ※ {filteredCandidates.some(c => (c.job || '').includes('취부') || Number(c.s_score_fit) > 0) ? '용접 및 취부 실기 기량 평가 표준에 따른 합격자 등급 분포.' : '용접 단독 실기 기량 평가 표준에 따른 합격자 등급 분포.'}
                 </p>
               </div>
 
               {/* 4) E-9 경력자 중 기량 등급 - Full Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[12.5px] font-bold text-slate-800">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 bg-amber-600 rounded-full"></span> 4) E-9 경력자 중 기량 등급
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">단위: 명</span>
+                  <span className="text-[10.5px] text-slate-500 font-normal">단위: 명</span>
                 </div>
                 <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                  <table className="w-full table-fixed text-center text-xs border-collapse">
+                  <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                        <th rowSpan={2} className="py-1 px-1 border-r border-slate-300 w-[18%] whitespace-nowrap align-middle">구분</th>
-                        <th colSpan={3} className="py-0.5 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[10.5px]">
+                        <th rowSpan={2} className="py-1.5 px-1 border-r border-slate-300 w-[18%] whitespace-nowrap align-middle">구분</th>
+                        <th colSpan={3} className="py-1 px-0.5 border-r border-slate-300 bg-blue-50/70 text-[#002c5f] text-[11px]">
                           합격 기준 (S~B)
                         </th>
-                        <th colSpan={2} className="py-0.5 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[10.5px]">
+                        <th colSpan={2} className="py-1 px-0.5 border-r border-slate-300 bg-purple-50/70 text-purple-900 text-[11px]">
                           탈락/조건부 기준 (C~D)
                         </th>
-                        <th rowSpan={2} className="py-1 px-1 bg-slate-200/70 font-black text-slate-900 w-[16%] align-middle">합계</th>
+                        <th rowSpan={2} className="py-1.5 px-1 bg-slate-200/70 font-black text-slate-900 w-[16%] align-middle">합계</th>
                       </tr>
-                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11px]">
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">S</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">A</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">B</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[13%]">C</th>
-                        <th className="py-0.5 px-0.5 border-r border-slate-300 w-[14%]">D</th>
+                      <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-300 text-[11.5px]">
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">S</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">A</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">B</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">C</th>
+                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%]">D</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
                       <tr>
-                        <td className="py-1 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">용접</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-400">{passedE9SkillGradeDetail.weld.S || '-'}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.weld.A}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.weld.B}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.weld.C}</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.weld.D || '-'}</td>
-                        <td className="py-1 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedE9SkillGradeDetail.weld.total}</td>
+                        <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">용접</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-slate-400">{passedE9SkillGradeDetail.weld.S || '-'}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.weld.A}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.weld.B}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.weld.C}</td>
+                        <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.weld.D || '-'}</td>
+                        <td className="py-1.5 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedE9SkillGradeDetail.weld.total}</td>
                       </tr>
                       {passedE9SkillGradeDetail.fit.total > 0 && (
                         <tr>
-                          <td className="py-1 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">선각 취부</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-400">{passedE9SkillGradeDetail.fit.S || '-'}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.fit.A}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.fit.B}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.fit.C}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.fit.D}</td>
-                          <td className="py-1 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedE9SkillGradeDetail.fit.total}</td>
+                          <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 whitespace-nowrap">취부</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-slate-400">{passedE9SkillGradeDetail.fit.S || '-'}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.fit.A}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold">{passedE9SkillGradeDetail.fit.B}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.fit.C}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-900">{passedE9SkillGradeDetail.fit.D}</td>
+                          <td className="py-1.5 px-1 font-mono font-black text-slate-900 bg-slate-100">{passedE9SkillGradeDetail.fit.total}</td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
+                <p className="text-[10px] text-slate-500 font-medium leading-tight">
                   * E-9 비자 경력 합격자 총 {passedE9SkillGradeDetail.weld.total + passedE9SkillGradeDetail.fit.total}명(선발 인원의 {passedAgeDetail.total > 0 ? Math.round(((passedE9SkillGradeDetail.weld.total + passedE9SkillGradeDetail.fit.total) / passedAgeDetail.total) * 1000) / 10 : 0}%)의 직종별 기량 분포.
                 </p>
               </div>
 
-              {/* 5) 합격자 기량 등급 및 한국어 소통 수준 교차 분석 - Full Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+              {/* 5) 송출 기관별 합격자 질적 수준 및 E-9 비중 - Full Width */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[12.5px] font-bold text-slate-800">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 bg-indigo-700 rounded-full"></span> 5) 합격자 기량 등급 및 한국어 소통 수준 교차 분석
+                    <span className="w-2 h-2 bg-teal-700 rounded-full"></span> 5) 송출 기관별 합격자 질적 수준 및 E-9 비중
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">단위: 명, 점, %</span>
+                  <span className="text-[10.5px] text-slate-500 font-normal">단위: 명, 점, %</span>
                 </div>
                 <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                  <table className="w-full table-fixed text-center text-xs border-collapse">
+                  <table className="w-full table-fixed text-center text-[12.5px] border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                        <th className="py-1 px-1 border-r border-slate-300 w-[22%] whitespace-nowrap">실기 기량 구간</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[15%]">인원 소계</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[18%] text-blue-900">어학 적격(A~C)</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[18%] text-purple-900">어학 조건부(D~E)</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[13%]">구술 평균</th>
-                        <th className="py-1 px-1 bg-slate-200/70 font-black text-slate-900 w-[14%]">배치 적합도</th>
+                        <th className="py-1.5 px-1 border-r border-slate-300 w-[16%] whitespace-nowrap">송출 기관</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[10%] whitespace-nowrap">국가</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[11%] whitespace-nowrap">합격 소계</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[14%] text-blue-900 whitespace-nowrap">최종(순수)</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[10%] text-purple-900 whitespace-nowrap">조건부</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[19%] whitespace-nowrap">E-9 비중</th>
+                        <th className="py-1.5 px-0.5 border-r border-slate-300 w-[10%] whitespace-nowrap">용접평균</th>
+                        <th className="py-1.5 px-0.5 text-center w-[10%] whitespace-nowrap">어학평균</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
-                      <tr>
-                        <td className="py-1 px-1 font-bold text-blue-950 border-r border-slate-200 bg-blue-50/40 text-center whitespace-nowrap">우수 (S·A등급)</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900">{passedSkillKoreanCrossDetail.S_A.total}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-blue-900">{passedSkillKoreanCrossDetail.S_A.passK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-800">{passedSkillKoreanCrossDetail.S_A.condK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-800">{passedSkillKoreanCrossDetail.S_A.avgK}점</td>
-                        <td className="py-1 px-1 font-bold text-emerald-800 bg-emerald-50/60 whitespace-nowrap">즉시 투입 최적</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 text-center whitespace-nowrap">양호 (B등급)</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900">{passedSkillKoreanCrossDetail.B.total}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-blue-900">{passedSkillKoreanCrossDetail.B.passK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-800">{passedSkillKoreanCrossDetail.B.condK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-800">{passedSkillKoreanCrossDetail.B.avgK}점</td>
-                        <td className="py-1 px-1 font-bold text-blue-800 bg-blue-50/60 whitespace-nowrap">표준 공정 투입</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 px-1 font-bold text-slate-800 border-r border-slate-200 bg-slate-50/60 text-center whitespace-nowrap">기본 (C·D등급)</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900">{passedSkillKoreanCrossDetail.C_D.total}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-blue-900">{passedSkillKoreanCrossDetail.C_D.passK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-800">{passedSkillKoreanCrossDetail.C_D.condK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-800">{passedSkillKoreanCrossDetail.C_D.avgK}점</td>
-                        <td className="py-1 px-1 font-bold text-amber-800 bg-amber-50/60 whitespace-nowrap">멘토링 육성</td>
-                      </tr>
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-100 font-bold text-slate-900 border-t border-slate-300 text-xs">
-                        <td className="py-1 px-1 border-r border-slate-300 font-black text-center whitespace-nowrap">[합계 / 평균]</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-300 font-black text-slate-900">{passedSkillKoreanCrossDetail.total.total}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-300 font-black text-blue-900">{passedSkillKoreanCrossDetail.total.passK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-300 font-black text-purple-900">{passedSkillKoreanCrossDetail.total.condK}명</td>
-                        <td className="py-1 px-0.5 font-mono border-r border-slate-300 font-black text-slate-900">{passedSkillKoreanCrossDetail.total.avgK}점</td>
-                        <td className="py-1 px-1 font-black text-emerald-800 bg-emerald-100/50 whitespace-nowrap">총 {passedSkillKoreanCrossDetail.total.total}명 관리</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
-                  * 기량 우수(S·A) 및 어학 적격 동시 보유자 즉시 현장 배치, 어학 조건부 인원은 입국 전 40시간 집중 교육 연계.
-                </p>
-              </div>
-
-              {/* 6) 송출 기관별 합격자 질적 수준 및 E-9 비중 - Full Width */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 bg-teal-700 rounded-full"></span> 6) 송출 기관별 합격자 질적 수준 및 E-9 비중
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-normal">단위: 명, 점, %</span>
-                </div>
-                <div className="overflow-hidden border border-slate-300 rounded-lg shadow-xs">
-                  <table className="w-full table-fixed text-center text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                        <th className="py-1 px-1 border-r border-slate-300 w-[16%] whitespace-nowrap">송출 기관</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[10%] whitespace-nowrap">국가</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[11%] whitespace-nowrap">합격 소계</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[14%] text-blue-900 whitespace-nowrap">최종(순수)</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[10%] text-purple-900 whitespace-nowrap">조건부</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[19%] whitespace-nowrap">E-9 비중</th>
-                        <th className="py-1 px-0.5 border-r border-slate-300 w-[10%] whitespace-nowrap">용접평균</th>
-                        <th className="py-1 px-0.5 text-center w-[10%] whitespace-nowrap">어학평균</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 font-semibold text-slate-700 text-xs">
                       {passedAgencyQualityDetail.map(ag => (
                         <tr key={ag.agency}>
-                          <td className="py-1 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 text-center whitespace-nowrap">{ag.agency}</td>
-                          <td className="py-1 px-0.5 font-bold text-slate-800 border-r border-slate-200 bg-slate-50/40 text-center whitespace-nowrap text-xs">{ag.country}</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900 whitespace-nowrap">{ag.totalPass}명</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold whitespace-nowrap">{ag.purePass}명 ({ag.pureRatio}%)</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-purple-800 whitespace-nowrap">{ag.condPass}명</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-amber-800 font-bold whitespace-nowrap">{ag.e9Pass}명 ({ag.e9Ratio}%)</td>
-                          <td className="py-1 px-0.5 font-mono border-r border-slate-200 text-slate-800 whitespace-nowrap">{ag.avgWeld > 0 ? `${ag.avgWeld}점` : '-'}</td>
-                          <td className="py-1 px-0.5 font-mono text-slate-800 whitespace-nowrap">{ag.avgKorean > 0 ? `${ag.avgKorean}점` : '-'}</td>
+                          <td className="py-1.5 px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 text-center whitespace-nowrap">{ag.agency}</td>
+                          <td className="py-1.5 px-0.5 font-bold text-slate-800 border-r border-slate-200 bg-slate-50/40 text-center whitespace-nowrap text-xs">{ag.country}</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900 whitespace-nowrap">{ag.totalPass}명</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold whitespace-nowrap">{ag.purePass}명 ({ag.pureRatio}%)</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-purple-800 whitespace-nowrap">{ag.condPass}명</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-amber-800 font-bold whitespace-nowrap">{ag.e9Pass}명 ({ag.e9Ratio}%)</td>
+                          <td className="py-1.5 px-0.5 font-mono border-r border-slate-200 text-slate-800 whitespace-nowrap">{ag.avgWeld > 0 ? `${ag.avgWeld}점` : '-'}</td>
+                          <td className="py-1.5 px-0.5 font-mono text-slate-800 whitespace-nowrap">{ag.avgKorean > 0 ? `${ag.avgKorean}점` : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
+                <p className="text-[10px] text-slate-500 font-medium leading-tight">
                   * 기관별 합격자의 직무 기량과 어학 성취도, E-9 숙련 인력 유치 비중을 종합 비교하여 향후 송출 협력사 평가 및 쿼터 배정에 반영.
                 </p>
               </div>

@@ -60,6 +60,9 @@ ChartJS.register(
   Legend
 );
 
+// Set default font family for all ChartJS instances
+ChartJS.defaults.font.family = "'HD Hyundai', 'Noto Sans KR', sans-serif";
+
 // Custom Chart.js Plugin for displaying numbers on top of bars during print/view
 const barDataLabelsPlugin = {
   id: 'barDataLabels',
@@ -73,7 +76,7 @@ const barDataLabelsPlugin = {
           const val = dataset.data[index];
           if (val !== undefined && val !== null) {
             const { x, y } = element.tooltipPosition();
-            ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.font = 'bold 11px "HD Hyundai", "Noto Sans KR", sans-serif';
             ctx.fillStyle = '#0f172a';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';

@@ -1,13 +1,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
 @import "tailwindcss";
 
-/* HD Hyundai Corporate Custom Fonts (Auto-loads when uploaded to /public/fonts/ or /public/) */
+/* HD Hyundai Corporate Custom Fonts */
 @font-face {
   font-family: 'HD Hyundai';
-  src: url('/fonts/HD-Light OTF.otf') format('opentype'),
-       url('/fonts/HD-Light.otf') format('opentype'),
-       url('/HD-Light OTF.otf') format('opentype'),
+  src: url('/fonts/HD-Light.otf') format('opentype'),
+       url('/fonts/HD-Light OTF.otf') format('opentype'),
        url('/HD-Light.otf') format('opentype');
+  font-weight: 100 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Medium.otf') format('opentype'),
+       url('/fonts/HD-Medium OTF.otf') format('opentype'),
+       url('/HD-Medium.otf') format('opentype');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Bold.otf') format('opentype'),
+       url('/fonts/HD-Bold OTF.otf') format('opentype'),
+       url('/HD-Bold.otf') format('opentype');
+  font-weight: 700 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Explicit weight aliases for complete browser compatibility */
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Light.otf') format('opentype'),
+       url('/fonts/HD-Light OTF.otf') format('opentype');
   font-weight: 300;
   font-style: normal;
   font-display: swap;
@@ -15,22 +44,45 @@
 
 @font-face {
   font-family: 'HD Hyundai';
-  src: url('/fonts/HD-Medium OTF.otf') format('opentype'),
-       url('/fonts/HD-Medium.otf') format('opentype'),
-       url('/HD-Medium OTF.otf') format('opentype'),
-       url('/HD-Medium.otf') format('opentype');
-  font-weight: 400 500;
+  src: url('/fonts/HD-Medium.otf') format('opentype'),
+       url('/fonts/HD-Medium OTF.otf') format('opentype');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
   font-family: 'HD Hyundai';
-  src: url('/fonts/HD-Bold OTF.otf') format('opentype'),
-       url('/fonts/HD-Bold.otf') format('opentype'),
-       url('/HD-Bold OTF.otf') format('opentype'),
-       url('/HD-Bold.otf') format('opentype');
-  font-weight: 700 800 900;
+  src: url('/fonts/HD-Medium.otf') format('opentype'),
+       url('/fonts/HD-Medium OTF.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Bold.otf') format('opentype'),
+       url('/fonts/HD-Bold OTF.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Bold.otf') format('opentype'),
+       url('/fonts/HD-Bold OTF.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HD Hyundai';
+  src: url('/fonts/HD-Bold.otf') format('opentype'),
+       url('/fonts/HD-Bold OTF.otf') format('opentype');
+  font-weight: 900;
   font-style: normal;
   font-display: swap;
 }
@@ -38,6 +90,7 @@
 @theme {
   --font-sans: 'HD Hyundai', 'Noto Sans KR', ui-sans-serif, system-ui, sans-serif;
   --font-kor: 'HD Hyundai', 'Noto Sans KR', sans-serif;
+  --font-mono: 'HD Hyundai', 'Noto Sans KR', monospace;
   
   /* HD Hyundai Official Colors */
   --color-hd-navy: #002c5f;
@@ -45,6 +98,10 @@
 }
 
 @layer base {
+  *, *::before, *::after {
+    font-family: 'HD Hyundai', 'Noto Sans KR', sans-serif;
+  }
+
   body {
     background-color: #030f1c;
     color: #e2e8f0;
@@ -52,6 +109,14 @@
     -webkit-font-smoothing: antialiased;
     font-size: 16px;
   }
+
+  button, input, select, textarea, table, th, td, h1, h2, h3, h4, h5, h6, p, span, div {
+    font-family: inherit;
+  }
+}
+
+.report-page, .report-page * {
+  font-family: 'HD Hyundai', 'Noto Sans KR', sans-serif !important;
 }
 
 @layer components {

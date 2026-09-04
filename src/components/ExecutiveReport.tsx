@@ -941,7 +941,7 @@ export default function ExecutiveReport() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-900 text-slate-800 overflow-y-auto print:overflow-visible print:bg-white print:p-0 print:m-0 print:text-black">
+    <div className="flex-1 flex flex-col bg-slate-900 text-slate-800 overflow-y-auto print:h-auto print:min-h-0 print:overflow-visible print:bg-white print:p-0 print:m-0 print:text-black print:block print:static">
       {/* Print Specific CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
@@ -949,9 +949,18 @@ export default function ExecutiveReport() {
             size: A4 portrait;
             margin: 0;
           }
-          body {
+          html, body, #root, #root > div, main {
+            width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            position: static !important;
+            display: block !important;
             background-color: #ffffff !important;
             color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
             print-color-adjust: exact !important;
             -webkit-print-color-adjust: exact !important;
           }
@@ -962,19 +971,23 @@ export default function ExecutiveReport() {
             width: 210mm !important;
             min-height: 297mm !important;
             height: 297mm !important;
-            margin: 0 !important;
-            padding: 14mm 15mm !important;
+            margin: 0 auto !important;
             box-shadow: none !important;
             border: none !important;
             border-radius: 0 !important;
             background-color: #ffffff !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
             page-break-after: always !important;
             break-after: page !important;
             position: relative !important;
             overflow: hidden !important;
             box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
           }
-          .report-page:last-child {
+          .report-page:last-of-type, .report-page:last-child {
             page-break-after: auto !important;
             break-after: auto !important;
           }
@@ -1285,7 +1298,7 @@ export default function ExecutiveReport() {
       </div>
 
       {/* Main Report Container */}
-      <div className="py-8 px-4 flex flex-col items-center gap-8 print:p-0 print:gap-0">
+      <div className="py-8 px-4 flex flex-col items-center gap-8 print:p-0 print:m-0 print:gap-0 print:block print:w-full">
 
         {/* ========================================================= */}
         {/* COVER PAGE (보고서 표지) */}

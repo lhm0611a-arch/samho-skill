@@ -44,7 +44,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-hd-navy border-b border-[#1e3a5f] text-white px-2 sm:px-4 md:px-6 shadow-md flex justify-between items-center shrink-0 z-50 relative h-14 md:h-16 gap-2">
+    <header className="no-print print:hidden bg-hd-navy border-b border-[#1e3a5f] text-white px-2 sm:px-4 md:px-6 shadow-md flex justify-between items-center shrink-0 z-50 relative h-14 md:h-16 gap-2">
       <div className="absolute bottom-0 left-0 w-full h-[3px] bg-hd-green"></div>
       
       {/* Brand / Logo Section */}

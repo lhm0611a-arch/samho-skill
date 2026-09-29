@@ -295,8 +295,8 @@
 
   .report-page {
     width: 210mm !important;
-    min-height: 297mm !important;
-    height: 297mm !important;
+    min-height: 296mm !important;
+    height: 296mm !important;
     margin: 0 auto !important;
     box-shadow: none !important;
     border: none !important;
@@ -307,7 +307,7 @@
     page-break-after: always !important;
     break-after: page !important;
     position: relative !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;

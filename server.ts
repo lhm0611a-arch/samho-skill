@@ -12,7 +12,17 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiClient: GoogleGenAI | null = null;
+function getAi(): GoogleGenAI {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is required');
+    }
+    aiClient = new GoogleGenAI({ apiKey });
+  }
+  return aiClient;
+}
 
 // Persistent Server Audio Cache Directory
 const CACHE_DIR = path.join(process.cwd(), 'server_cache', 'audio');
@@ -156,7 +166,7 @@ app.post('/api/generate-questions', async (req, res) => {
     let delay = 2000;
     while (retries > 0) {
       try {
-        response = await ai.models.generateContent({
+        response = await getAi().models.generateContent({
           model: 'gemini-3.7-flash',
           contents: prompt,
         });
@@ -350,9 +360,15 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    // Start non-blocking warmup in background
-    setTimeout(startAudioWarmup, 1000);
+    // Non-blocking warmup in background with safe catch
+    setTimeout(() => {
+      startAudioWarmup().catch(err => {
+        console.warn('Audio warmup background warning:', err.message);
+      });
+    }, 3000);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+});

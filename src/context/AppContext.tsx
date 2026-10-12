@@ -38,6 +38,9 @@ interface AppContextType {
   fetchData: () => Promise<void>;
   isLoading: boolean;
   logout: () => void;
+  updateCandidateMedia: (uid: string, videoUrl?: string, testUrl?: string) => Promise<boolean>;
+  batchUpdateCandidateMedia: (updates: Array<{ uid?: string; app_no: string; eval_type?: string; eval_date?: string; video_url?: string; test_url?: string }>) => Promise<{ success: boolean; updatedCount: number; message?: string }>;
+  toggleCandidateStar: (uid: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -47,7 +50,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [globalLogs, setGlobalLogs] = useState<Log[]>([]);
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [evaluatorName, setEvaluatorName] = useState('');
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyGi7nLuyFz_DIuEYdBu_4bWWa0VWU93zVnsUQi9SDLi9r7lU0c1a_j6gNigPoyhuf5/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxrCq-QC62HtmBYF4C5gibdCHb53D8dUvhwY4vXbFCPk_8TruwZ34eF00GmV1pRUjDD/exec';
   const [gasUrl, setGasUrlState] = useState<string>(DEFAULT_GAS_URL);
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [selectedCandidateUid, setSelectedCandidateUid] = useState<string | null>(null);
@@ -57,7 +60,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     const savedUrl = localStorage.getItem('gasUrl') || localStorage.getItem('hd_gas_url');
-    if (savedUrl) {
+    const oldUrl = 'https://script.google.com/macros/s/AKfycbyGi7nLuyFz_DIuEYdBu_4bWWa0VWU93zVnsUQi9SDLi9r7lU0c1a_j6gNigPoyhuf5/exec';
+    
+    if (savedUrl && savedUrl !== oldUrl && savedUrl.trim().startsWith('https://script.google.com')) {
       setGasUrlState(savedUrl);
     } else {
       setGasUrlState(DEFAULT_GAS_URL);
@@ -260,6 +265,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         seenUids.set(baseUid, count + 1);
         const uniqueUid = count === 0 ? baseUid : `${baseUid}_${count}`;
 
+        const videoUrl = String(d.video_url || d['영상'] || d['동영상'] || d['video'] || d['AF'] || '').trim();
+        const testUrl = String(d.test_url || d['인성검사'] || d['인성'] || d['test'] || d['AG'] || '').trim();
+        const isStarred = Boolean(d.starred || d['별표'] || d['star'] || d['AH'] === '★' || d['AH'] === 'O' || d['AH'] === '1' || d['AH'] === true);
+        const interviewMemo = String(d.interview_memo || d.memo || d['특이사항'] || d['면접특이사항'] || d['AI'] || '').trim();
+        const skillMemo = String(d.skill_memo || d['기량특이사항'] || d['AJ'] || '').trim();
+        const combinedMemo = interviewMemo || skillMemo || '';
+
         return {
             ...d,
             app_no: appNo,
@@ -282,7 +294,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             grade_fit: s_f > 0 ? getSkillGradeByScore(s_f) : '-',
             k_status: k_stat,
             s_status: s_stat,
-            result: res
+            result: res,
+            video_url: videoUrl,
+            test_url: testUrl,
+            memo: combinedMemo,
+            interview_memo: interviewMemo,
+            skill_memo: skillMemo,
+            starred: isStarred
         };
       });
 
@@ -307,6 +325,162 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const updateCandidateMedia = async (uid: string, videoUrl?: string, testUrl?: string): Promise<boolean> => {
+    try {
+      const target = candidates.find(c => c.uid === uid);
+      if (!target) return false;
+
+      const nextCandidates = candidates.map(c => {
+        if (c.uid === uid) {
+          return {
+            ...c,
+            video_url: videoUrl !== undefined ? videoUrl : c.video_url,
+            test_url: testUrl !== undefined ? testUrl : c.test_url
+          };
+        }
+        return c;
+      });
+
+      setCandidates(nextCandidates);
+      localStorage.setItem('hd_candidates', JSON.stringify(nextCandidates));
+
+      // Sync to Google Apps Script if URL configured
+      if (gasUrl) {
+        try {
+          await fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              type: 'update_media',
+              app_no: target.app_no,
+              eval_type: target.eval_type,
+              name: target.name,
+              video_url: videoUrl !== undefined ? videoUrl : target.video_url,
+              test_url: testUrl !== undefined ? testUrl : target.test_url
+            })
+          });
+        } catch (gasErr) {
+          console.warn('Google Sheet GAS single update sync warning:', gasErr);
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to update candidate media:', err);
+      return false;
+    }
+  };
+
+  const batchUpdateCandidateMedia = async (
+    updates: Array<{ uid?: string; app_no: string; eval_type?: string; eval_date?: string; video_url?: string; test_url?: string }>
+  ): Promise<{ success: boolean; updatedCount: number; message?: string }> => {
+    if (!updates || updates.length === 0) {
+      return { success: true, updatedCount: 0 };
+    }
+
+    try {
+      // Map for quick matching
+      const updateMap = new Map<string, typeof updates[0]>();
+      updates.forEach(u => {
+        const key = `${normalizeAppNo(u.app_no)}_${normalizeType(u.eval_type || '')}`;
+        updateMap.set(key, u);
+      });
+
+      let updatedCount = 0;
+      const nextCandidates = candidates.map(c => {
+        const key = `${normalizeAppNo(c.app_no)}_${normalizeType(c.eval_type || '')}`;
+        const match = (c.uid && updates.find(u => u.uid === c.uid)) || updateMap.get(key);
+        if (match) {
+          let changed = false;
+          let newV = c.video_url;
+          let newT = c.test_url;
+          if (match.video_url !== undefined && match.video_url !== c.video_url) {
+            newV = match.video_url;
+            changed = true;
+          }
+          if (match.test_url !== undefined && match.test_url !== c.test_url) {
+            newT = match.test_url;
+            changed = true;
+          }
+          if (changed) {
+            updatedCount++;
+            return { ...c, video_url: newV, test_url: newT };
+          }
+        }
+        return c;
+      });
+
+      setCandidates(nextCandidates);
+      localStorage.setItem('hd_candidates', JSON.stringify(nextCandidates));
+
+      // Sync to Google Sheets via GAS
+      if (gasUrl) {
+        try {
+          await fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              type: 'batch_update_media',
+              updates: updates.map(u => ({
+                app_no: normalizeAppNo(u.app_no),
+                eval_type: normalizeType(u.eval_type || ''),
+                eval_date: normalizeDate(u.eval_date || ''),
+                video_url: u.video_url || '',
+                test_url: u.test_url || ''
+              }))
+            })
+          });
+        } catch (gasErr) {
+          console.warn('Google Sheet GAS batch sync warning:', gasErr);
+        }
+      }
+
+      return { success: true, updatedCount };
+    } catch (err: any) {
+      console.error('Batch media update error:', err);
+      return { success: false, updatedCount: 0, message: err.message };
+    }
+  };
+
+  const toggleCandidateStar = async (uid: string): Promise<boolean> => {
+    try {
+      const target = candidates.find(c => c.uid === uid);
+      if (!target) return false;
+
+      const nextStarred = !target.starred;
+      const nextCandidates = candidates.map(c => {
+        if (c.uid === uid) {
+          return { ...c, starred: nextStarred };
+        }
+        return c;
+      });
+
+      setCandidates(nextCandidates);
+      localStorage.setItem('hd_candidates', JSON.stringify(nextCandidates));
+
+      if (gasUrl) {
+        try {
+          fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              type: 'toggle_star',
+              app_no: target.app_no,
+              eval_type: target.eval_type,
+              name: target.name,
+              starred: nextStarred
+            })
+          }).catch(e => console.warn('GAS toggle_star warning:', e));
+        } catch (gasErr) {
+          console.warn('Google Sheet GAS toggle star sync warning:', gasErr);
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to toggle star:', err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (userRole && gasUrl) {
       fetchData();
@@ -324,7 +498,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       candidates, setCandidates, globalLogs, setGlobalLogs, userRole, setUserRole,
       evaluatorName, setEvaluatorName, gasUrl, setGasUrl, currentView, setCurrentView,
       selectedCandidateUid, setSelectedCandidateUid,
-      confCountry, setConfCountry, confAgency, setConfAgency, fetchData, isLoading, logout
+      confCountry, setConfCountry, confAgency, setConfAgency, fetchData, isLoading, logout,
+      updateCandidateMedia, batchUpdateCandidateMedia, toggleCandidateStar
     }}>
       {children}
     </AppContext.Provider>

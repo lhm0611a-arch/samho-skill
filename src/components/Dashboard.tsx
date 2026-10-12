@@ -19,17 +19,26 @@ import {
   ChevronDown,
   CheckSquare,
   Square,
-  Check
+  Check,
+  Video,
+  FolderSync,
+  Play,
+  ExternalLink,
+  Edit2,
+  Star
 } from 'lucide-react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { useAppContext } from '../context/AppContext';
-import { checkKoreanPass, checkSkillPass, determineResult, getBadgeHtml, calculateAge, normalizeDate, normalizeType } from '../lib/utils';
+import { checkKoreanPass, checkSkillPass, determineResult, getBadgeHtml, calculateAge, normalizeDate, normalizeType, getDrivePreviewUrl, formatCount, formatPeople } from '../lib/utils';
+import { MediaLinkModal } from './MediaLinkModal';
+import { MediaViewerModal } from './MediaViewerModal';
+import { IndividualMediaModal } from './IndividualMediaModal';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export default function Dashboard() {
-  const { candidates, globalLogs, setCurrentView, setSelectedCandidateUid } = useAppContext();
+  const { candidates, globalLogs, setCurrentView, setSelectedCandidateUid, updateCandidateMedia, toggleCandidateStar } = useAppContext();
   
   const [filterType, setFilterType] = useState('all');
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -41,6 +50,32 @@ export default function Dashboard() {
   const [sortCol, setSortCol] = useState('app_no');
   const [sortAsc, setSortAsc] = useState(true);
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
+
+  // Google Drive Media Link & Viewer Modals
+  const [showMediaLinkModal, setShowMediaLinkModal] = useState(false);
+  const [mediaViewer, setMediaViewer] = useState<{
+    isOpen: boolean;
+    title: string;
+    candidateName?: string;
+    appNo?: string;
+    mediaType: 'video' | 'test';
+    url: string;
+  } | null>(null);
+  const [isEditingMedia, setIsEditingMedia] = useState(false);
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [editTestUrl, setEditTestUrl] = useState('');
+  const [isSavingMedia, setIsSavingMedia] = useState(false);
+
+  // Individual Candidate Media Registration Modal state
+  const [individualModal, setIndividualModal] = useState<{
+    isOpen: boolean;
+    candidate: any | null;
+    focus: 'video' | 'test' | 'all';
+  }>({
+    isOpen: false,
+    candidate: null,
+    focus: 'all'
+  });
 
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
@@ -201,7 +236,10 @@ export default function Dashboard() {
     list.sort((a: any, b: any) => {
       let vA = a[sortCol];
       let vB = b[sortCol];
-      if (sortCol === 'k_score' || sortCol === 'age') { 
+      if (sortCol === 'starred') {
+        vA = a.starred ? 1 : 0;
+        vB = b.starred ? 1 : 0;
+      } else if (sortCol === 'k_score' || sortCol === 'age') { 
         vA = Number(vA) || 0; 
         vB = Number(vB) || 0; 
       } else { 
@@ -217,11 +255,11 @@ export default function Dashboard() {
 
   const exportToCSV = () => {
     if (filtered.length === 0) return alert('내보낼 데이터가 없습니다.');
-    const headers = ['수험번호', '성명', '생년월일', '직종', 'E9', '국가', '업체', '평가구분', '평가일', '한국어점수', '한국어등급', '용접점수', '취부점수', '실기등급(용접)', '실기등급(취부)', '통합결과', '특이사항'];
+    const headers = ['수험번호', '성명', '별표(★)', '생년월일', '직종', 'E9', '국가', '업체', '평가구분', '평가일', '한국어점수', '한국어등급', '용접점수', '취부점수', '실기등급(용접)', '실기등급(취부)', '통합결과', '한국어특이사항', '기량특이사항', '종합의견'];
     const rows = filtered.map(c => [
-      c.app_no, c.name, c.dob, c.job, c.e9, c.country, c.agency, c.eval_type, c.eval_date,
+      c.app_no, c.name, c.starred ? '★' : '', c.dob, c.job, c.e9, c.country, c.agency, c.eval_type, c.eval_date,
       c.k_score || 0, c.k_grade || '-', c.s_score_weld || 0, c.s_score_fit || 0, c.grade_weld || '-', c.grade_fit || '-',
-      c.result || '대기', (c.memo || '').replace(/\n/g, ' ')
+      c.result || '대기', (c.interview_memo || '').replace(/\n/g, ' '), (c.skill_memo || '').replace(/\n/g, ' '), (c.memo || '').replace(/\n/g, ' ')
     ]);
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -239,6 +277,7 @@ export default function Dashboard() {
   };
 
   const total = filtered.length;
+  const starredTotal = filtered.filter(c => c.starred).length;
   const kList = filtered.filter(c => (c.k_score || 0) > 0);
   const kComp = kList.length;
   const kPassPure = kList.filter(c => checkKoreanPass(c) === '최종 합격').length;
@@ -265,6 +304,7 @@ export default function Dashboard() {
   else if (activeSubFilter === 't-comp') { tableList = filtered.filter(c => (c.k_score || 0) > 0 && isSkillComplete(c)); filterBadgeText = "통합 최종 판정 완료"; }
   else if (activeSubFilter === 't-pass-pure') { tableList = filtered.filter(c => (c.k_score || 0) > 0 && isSkillComplete(c) && determineResult(c) === '최종 합격'); filterBadgeText = "통합 순수 합격"; }
   else if (activeSubFilter === 't-pass-cond') { tableList = filtered.filter(c => (c.k_score || 0) > 0 && isSkillComplete(c) && (determineResult(c) === '최종 합격' || determineResult(c) === '조건부 합격')); filterBadgeText = "통합 조건부 포함 합격"; }
+  else if (activeSubFilter === 'starred') { tableList = filtered.filter(c => c.starred); filterBadgeText = "★ 별표 대상자"; }
 
   const getChartData = (pure: number, cond: number, fail: number, empty: boolean) => {
     if (empty) return { labels: ['Empty'], datasets: [{ data: [1], backgroundColor: ['#f1f5f9'], borderWidth: 0 }] };
@@ -372,8 +412,17 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Action Buttons: Executive Report & Excel Download */}
+            {/* Action Buttons: Executive Report, Media Link & Excel Download */}
             <div className="flex items-center gap-2 ml-auto shrink-0">
+              <button 
+                onClick={() => setShowMediaLinkModal(true)} 
+                className="bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-bold transition-all shadow-md flex items-center gap-1.5 border border-blue-500/40 shrink-0 justify-center whitespace-nowrap"
+                title="특정 평가일자 영상 및 인성검사 결과 구글 드라이브 일괄 연결"
+              >
+                <FolderSync className="w-4 h-4 text-blue-300 shrink-0" />
+                <span>영상/인성 드라이브 연결</span>
+              </button>
+
               <button 
                 onClick={() => setCurrentView('report')} 
                 className="bg-emerald-700 hover:bg-emerald-600 text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-bold transition-all shadow-md flex items-center gap-1.5 border border-emerald-600 shrink-0 justify-center whitespace-nowrap"
@@ -467,7 +516,7 @@ export default function Dashboard() {
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                         isChecked ? 'bg-blue-800 text-blue-200' : 'bg-slate-800 text-slate-400'
                       }`}>
-                        {count}명
+                        {formatPeople(count)}
                       </span>
                     </label>
                   );
@@ -510,7 +559,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-end mb-2">
                   <div onClick={() => handleSubFilter('k-comp')} className="cursor-pointer group p-1.5 -ml-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                     <p className="text-xs text-slate-400 font-bold mb-0.5 group-hover:text-blue-400 transition-colors">평가 완료 <Search className="w-3 h-3 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
-                    <p className="text-3xl font-black text-slate-100 leading-none"><span>{kComp}</span><span className="text-xs font-bold text-slate-500 ml-1">/ <span>{total}</span>명</span></p>
+                    <p className="text-3xl font-black text-slate-100 leading-none"><span>{formatCount(kComp)}</span><span className="text-xs font-bold text-slate-500 ml-1">/ <span>{formatCount(total)}</span>명</span></p>
                   </div>
                   <div className="w-14 h-14 shrink-0"><Doughnut data={getChartData(kPassPure, kPassCond - kPassPure, kComp - kPassCond, kComp === 0)} options={chartOptions as any} /></div>
                 </div>
@@ -518,7 +567,7 @@ export default function Dashboard() {
                   <div onClick={() => handleSubFilter('k-pass-pure')} className="flex-1 text-center cursor-pointer group p-1 rounded-lg hover:bg-slate-700 transition-all flex flex-col justify-center items-center">
                     <p className="text-[10px] text-slate-400 font-bold mb-1 group-hover:text-blue-400 transition-colors">순수 합격 <Search className="w-2 h-2 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
                     <div className="flex items-center justify-center gap-1.5">
-                      <p className="text-xl font-black text-blue-400 leading-none"><span>{kPassPure}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
+                      <p className="text-xl font-black text-blue-400 leading-none"><span>{formatCount(kPassPure)}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
                       <p className="text-[10px] font-bold text-blue-300 bg-blue-900/30 border border-blue-500/20 px-1.5 py-0.5 rounded leading-none"><span>{kComp ? Math.round((kPassPure/kComp)*100) : 0}</span>%</p>
                     </div>
                   </div>
@@ -526,7 +575,7 @@ export default function Dashboard() {
                   <div onClick={() => handleSubFilter('k-pass-cond')} className="flex-1 text-center cursor-pointer group p-1 rounded-lg hover:bg-slate-700 transition-all flex flex-col justify-center items-center">
                     <p className="text-[10px] text-slate-400 font-bold mb-1 group-hover:text-hd-green transition-colors">조건부 포함 <Search className="w-2 h-2 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
                     <div className="flex items-center justify-center gap-1.5">
-                      <p className="text-xl font-black text-hd-green leading-none"><span>{kPassCond}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
+                      <p className="text-xl font-black text-hd-green leading-none"><span>{formatCount(kPassCond)}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
                       <p className="text-[10px] font-bold text-hd-green bg-green-900/20 border border-green-500/20 px-1.5 py-0.5 rounded leading-none"><span>{kComp ? Math.round((kPassCond/kComp)*100) : 0}</span>%</p>
                     </div>
                   </div>
@@ -551,7 +600,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-end mb-2">
                   <div onClick={() => handleSubFilter('s-comp')} className="cursor-pointer group p-1.5 -ml-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                     <p className="text-xs text-slate-400 font-bold mb-0.5 group-hover:text-hd-green transition-colors">평가 완료 <Search className="w-3 h-3 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
-                    <p className="text-3xl font-black text-hd-green leading-none"><span>{sComp}</span><span className="text-xs font-bold text-slate-500 ml-1">/ <span>{total}</span>명</span></p>
+                    <p className="text-3xl font-black text-hd-green leading-none"><span>{formatCount(sComp)}</span><span className="text-xs font-bold text-slate-500 ml-1">/ <span>{formatCount(total)}</span>명</span></p>
                   </div>
                   <div className="w-14 h-14 shrink-0"><Doughnut data={getChartData(sPass, 0, sComp - sPass, sComp === 0)} options={chartOptions as any} /></div>
                 </div>
@@ -559,7 +608,7 @@ export default function Dashboard() {
                   <div onClick={() => handleSubFilter('s-pass')} className="flex-1 text-center cursor-pointer group p-1 rounded-lg hover:bg-slate-700 transition-all flex flex-col justify-center items-center">
                     <p className="text-[10px] text-slate-400 font-bold mb-1 group-hover:text-hd-green transition-colors">실기 통과 (조건부 없음) <Search className="w-2 h-2 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
                     <div className="flex items-center justify-center gap-1.5">
-                      <p className="text-xl font-black text-slate-100 leading-none"><span>{sPass}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
+                      <p className="text-xl font-black text-slate-100 leading-none"><span>{formatCount(sPass)}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
                       <p className="text-[10px] font-bold text-hd-green bg-green-900/20 border border-green-500/20 px-1.5 py-0.5 rounded leading-none"><span>{sComp ? Math.round((sPass/sComp)*100) : 0}</span>%</p>
                     </div>
                   </div>
@@ -584,7 +633,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-end mb-2">
                   <div onClick={() => handleSubFilter('t-comp')} className="cursor-pointer group p-1.5 -ml-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                     <p className="text-xs text-slate-400 font-bold mb-0.5 group-hover:text-purple-400 transition-colors">최종 판정 완료 <Search className="w-3 h-3 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
-                    <p className="text-3xl font-black text-slate-100 leading-none"><span>{tComp}</span><span className="text-xs font-bold text-slate-500 ml-1">/ <span>{total}</span>명</span></p>
+                    <p className="text-3xl font-black text-slate-100 leading-none"><span>{formatCount(tComp)}</span><span className="text-xs font-bold text-slate-500 ml-1">/ <span>{formatCount(total)}</span>명</span></p>
                   </div>
                   <div className="w-14 h-14 shrink-0"><Doughnut data={getChartData(tPassPure, tPassCond - tPassPure, tComp - tPassCond, tComp === 0)} options={chartOptions as any} /></div>
                 </div>
@@ -592,7 +641,7 @@ export default function Dashboard() {
                   <div onClick={() => handleSubFilter('t-pass-pure')} className="flex-1 text-center cursor-pointer group p-1 rounded-lg hover:bg-slate-700 transition-all flex flex-col justify-center items-center">
                     <p className="text-[10px] text-slate-400 font-bold mb-1 group-hover:text-blue-400 transition-colors">순수 합격 <Search className="w-2 h-2 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
                     <div className="flex items-center justify-center gap-1.5">
-                      <p className="text-xl font-black text-blue-400 leading-none"><span>{tPassPure}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
+                      <p className="text-xl font-black text-blue-400 leading-none"><span>{formatCount(tPassPure)}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
                       <p className="text-[10px] font-bold text-blue-300 bg-blue-900/30 border border-blue-500/20 px-1.5 py-0.5 rounded leading-none"><span>{tComp ? Math.round((tPassPure/tComp)*100) : 0}</span>%</p>
                     </div>
                   </div>
@@ -600,7 +649,7 @@ export default function Dashboard() {
                   <div onClick={() => handleSubFilter('t-pass-cond')} className="flex-1 text-center cursor-pointer group p-1 rounded-lg hover:bg-slate-700 transition-all flex flex-col justify-center items-center">
                     <p className="text-[10px] text-slate-400 font-bold mb-1 group-hover:text-hd-green transition-colors">조건부 포함 <Search className="w-2 h-2 inline-block opacity-0 group-hover:opacity-100 ml-0.5" /></p>
                     <div className="flex items-center justify-center gap-1.5">
-                      <p className="text-xl font-black text-hd-green leading-none"><span>{tPassCond}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
+                      <p className="text-xl font-black text-hd-green leading-none"><span>{formatCount(tPassCond)}</span><span className="text-[10px] font-bold text-slate-500 ml-0.5">명</span></p>
                       <p className="text-[10px] font-bold text-hd-green bg-green-900/20 border border-green-500/20 px-1.5 py-0.5 rounded leading-none"><span>{tComp ? Math.round((tPassCond/tComp)*100) : 0}</span>%</p>
                     </div>
                   </div>
@@ -617,8 +666,24 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <h3 className="font-black text-slate-100 flex items-center gap-2 text-xl tracking-tight">
               <Zap className="w-6 h-6 text-amber-400" /> 실시간 통합 평가 현황
-              <span className={`ml-2 text-sm font-bold px-3 py-1 rounded-lg border transition-colors ${activeSubFilter ? 'text-blue-400 bg-blue-900/30 border-blue-500/30' : 'text-slate-400 bg-slate-800 border-slate-600'}`}>{tableList.length}명</span>
+              <span className={`ml-2 text-sm font-bold px-3 py-1 rounded-lg border transition-colors ${activeSubFilter ? 'text-blue-400 bg-blue-900/30 border-blue-500/30' : 'text-slate-400 bg-slate-800 border-slate-600'}`}>{formatPeople(tableList.length)}</span>
             </h3>
+            
+            {/* Quick Star Filter Button */}
+            <button
+              type="button"
+              onClick={() => handleSubFilter('starred')}
+              className={`text-xs px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all border shadow-sm ${
+                activeSubFilter === 'starred'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/50'
+                  : 'bg-amber-950/30 text-amber-300 border-amber-500/40 hover:bg-amber-900/40'
+              }`}
+              title="별표(★) 대상자만 모아보기"
+            >
+              <Star className={`w-3.5 h-3.5 ${activeSubFilter === 'starred' ? 'fill-slate-950 text-slate-950' : 'fill-amber-400 text-amber-400'}`} />
+              <span>별표 {formatPeople(starredTotal)}</span>
+            </button>
+
             {activeSubFilter && (
               <div className="text-xs bg-blue-900/30 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer hover:bg-blue-900/50 transition-colors" onClick={() => setActiveSubFilter(null)} title="필터 해제">
                 <Filter className="w-3.5 h-3.5" /> <span className="tracking-wide">{filterBadgeText}</span> <X className="w-3.5 h-3.5 ml-0.5 opacity-80" />
@@ -634,6 +699,15 @@ export default function Dashboard() {
           <table className="w-full text-left border-collapse dx-table min-w-[500px] lg:min-w-full whitespace-nowrap text-xs">
             <thead className="sticky top-0 z-10 bg-[#051326] shadow-sm text-[11px] md:text-xs">
               <tr>
+                <th 
+                  className={`sortable text-center px-1 md:px-2 w-9 cursor-pointer ${sortCol === 'starred' ? 'active' : ''}`} 
+                  onClick={() => handleSort('starred')}
+                  title="별표(★) 순으로 정렬"
+                >
+                  <span className="flex items-center justify-center gap-0.5 text-amber-400">
+                    ★<ArrowUpDown className="w-2.5 h-2.5 opacity-70" />
+                  </span>
+                </th>
                 <th className="text-center px-1 md:px-2">검증 구분</th>
                 <th className={`sortable text-center px-1 md:px-2 ${sortCol === 'app_no' ? 'active' : ''}`} onClick={() => handleSort('app_no')}>수험번호 <ArrowUpDown /></th>
                 <th className={`sortable text-center px-1 md:px-2 ${sortCol === 'name' ? 'active' : ''}`} onClick={() => handleSort('name')}>성명 <ArrowUpDown /></th>
@@ -642,20 +716,45 @@ export default function Dashboard() {
                 <th className={`text-center sortable px-1 md:px-2 ${sortCol === 'k_score' ? 'active' : ''}`} onClick={() => handleSort('k_score')}>한국어 <ArrowUpDown /></th>
                 <th className="text-center px-1 md:px-2">현장 기량</th>
                 <th className={`text-center sortable px-1 md:px-2 ${sortCol === 'result' ? 'active' : ''}`} onClick={() => handleSort('result')}>최종 결과 <ArrowUpDown /></th>
+                <th className="text-center px-1 md:px-2 min-w-[130px]">미디어 (영상/인성)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {tableList.length === 0 ? (
-                <tr><td colSpan={8} className="p-10 text-center text-slate-500 font-bold text-base">데이터가 없습니다.</td></tr>
+                <tr><td colSpan={10} className="p-10 text-center text-slate-500 font-bold text-base">데이터가 없습니다.</td></tr>
               ) : (
                 tableList.map((c, idx) => {
+                  const isPre = (c.eval_type || '').includes('사전');
                   const actualResult = determineResult(c);
                   const resClass = actualResult === '최종 합격' ? 'res-pass' : actualResult === '조건부 합격' ? 'res-cond' : actualResult === '대기' ? 'res-wait' : 'res-fail';
                   return (
                     <tr key={`${c.uid || c.app_no}_${idx}`} className="hover:bg-slate-800/50 cursor-pointer transition-colors" onClick={() => setSelectedCandidate(c)}>
+                      <td className="text-center px-1" onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCandidateStar(c.uid);
+                      }}>
+                        <button
+                          type="button"
+                          className={`p-1 rounded-md transition-all cursor-pointer ${
+                            c.starred 
+                              ? 'text-amber-400 bg-amber-400/15 border border-amber-400/40 shadow-sm' 
+                              : 'text-slate-600 hover:text-amber-400 hover:bg-slate-800'
+                          }`}
+                          title={c.starred ? "별표 해제" : "별표 등록"}
+                        >
+                          <Star className={`w-3.5 h-3.5 ${c.starred ? 'fill-amber-400 text-amber-400' : ''}`} />
+                        </button>
+                      </td>
                       <td className="text-center px-1 md:px-2" dangerouslySetInnerHTML={{__html: getBadgeHtml(c.eval_type)}}></td>
                       <td className="font-bold text-slate-300 text-center tracking-wider text-xs md:text-sm px-1 md:px-2">{c.app_no}</td>
-                      <td className="font-black text-slate-100 text-center text-xs md:text-sm px-1 md:px-2">{c.name?.toUpperCase()}</td>
+                      <td className="font-black text-slate-100 text-center text-xs md:text-sm px-1 md:px-2">
+                        <span className="inline-flex items-center gap-1 justify-center">
+                          {c.name?.toUpperCase()}
+                          {c.starred && (
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0 inline" />
+                          )}
+                        </span>
+                      </td>
                       <td className="text-slate-400 text-center font-bold text-xs md:text-sm px-1 md:px-2">{c.job}</td>
                       <td className="text-slate-400 text-xs md:text-sm text-center font-bold px-1 md:px-2">
                         {(() => {
@@ -673,6 +772,82 @@ export default function Dashboard() {
                         {isSkillComplete(c) ? ((c.job || '').includes('취부') ? `W:${c.grade_weld} F:${c.grade_fit}` : c.grade_weld) : '-'}
                       </td>
                       <td className="text-center px-1 md:px-2"><span className={`px-2 py-1 rounded-lg text-[10px] md:text-xs font-bold whitespace-nowrap ${resClass}`}>{actualResult}</span></td>
+                      <td className="text-center px-1 md:px-2" onClick={(e) => e.stopPropagation()}>
+                        {/* 사전기량검증 명단은 영상/인성 파일이 원래 없으므로 아무 버튼도 표시하지 않음 */}
+                        {isPre ? (
+                          <span className="text-[11px] text-slate-600 font-sans select-none">-</span>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* 영상 버튼: 등록되어 있으면 선명한 파란색 재생, 미등록 시 흐릿하게(반투명) 표시되고 클릭 시 바로 등록창으로 진입 */}
+                            {c.video_url ? (
+                              <button
+                                type="button"
+                                onClick={() => setMediaViewer({
+                                  isOpen: true,
+                                  title: `면접 영상`,
+                                  candidateName: c.name,
+                                  appNo: c.app_no,
+                                  mediaType: 'video',
+                                  url: c.video_url!
+                                })}
+                                className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/30 text-[11px] font-black transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                                title="면접 영상 재생하기"
+                              >
+                                <Play className="w-2.5 h-2.5 fill-current" />
+                                <span>영상</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setIndividualModal({
+                                  isOpen: true,
+                                  candidate: c,
+                                  focus: 'video'
+                                })}
+                                className="px-2 py-1 rounded-md bg-slate-800/40 hover:bg-slate-800 text-slate-500 hover:text-blue-300 border border-slate-700/40 hover:border-blue-500/50 text-[10px] opacity-40 hover:opacity-100 transition-all flex items-center gap-1"
+                                title="영상 미등록 (클릭하여 링크 직접 등록)"
+                              >
+                                <Video className="w-2.5 h-2.5" />
+                                <span>영상</span>
+                              </button>
+                            )}
+
+                            {/* 인성검사 버튼: 등록되어 있으면 선명한 보라색 열람, 미등록 시 흐릿하게(반투명) 표시되고 클릭 시 바로 등록창으로 진입 */}
+                            {c.test_url ? (
+                              <button
+                                type="button"
+                                onClick={() => setMediaViewer({
+                                  isOpen: true,
+                                  title: `인성검사 결과 보고서`,
+                                  candidateName: c.name,
+                                  appNo: c.app_no,
+                                  mediaType: 'test',
+                                  url: c.test_url!
+                                })}
+                                className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 text-[11px] font-black transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                                title="인성검사 결과지 열람하기"
+                              >
+                                <FileText className="w-2.5 h-2.5" />
+                                <span>인성</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setIndividualModal({
+                                  isOpen: true,
+                                  candidate: c,
+                                  focus: 'test'
+                                })}
+                                className="px-2 py-1 rounded-md bg-slate-800/40 hover:bg-slate-800 text-slate-500 hover:text-indigo-300 border border-slate-700/40 hover:border-indigo-500/50 text-[10px] opacity-40 hover:opacity-100 transition-all flex items-center gap-1"
+                                title="인성검사 미등록 (클릭하여 링크 직접 등록)"
+                              >
+                                <FileText className="w-2.5 h-2.5" />
+                                <span>인성</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })
@@ -700,6 +875,25 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 md:gap-3 mb-1.5 md:mb-2">
                       <h4 className="text-lg md:text-xl lg:text-2xl font-black text-slate-100">{selectedCandidate.name?.toUpperCase()}</h4>
                       <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-lg text-xs md:text-sm font-bold text-slate-300 tracking-wider">{selectedCandidate.app_no}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await toggleCandidateStar(selectedCandidate.uid);
+                          setSelectedCandidate({
+                            ...selectedCandidate,
+                            starred: !selectedCandidate.starred
+                          });
+                        }}
+                        className={`px-2.5 py-0.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm border ${
+                          selectedCandidate.starred
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30 shadow-amber-950/50"
+                            : "bg-slate-800 text-slate-400 border-slate-700 hover:text-amber-300 hover:border-amber-500/40"
+                        }`}
+                        title="별표 표시 토글"
+                      >
+                        <Star className={`w-3.5 h-3.5 ${selectedCandidate.starred ? "fill-amber-400 text-amber-400" : "text-slate-400"}`} />
+                        <span>{selectedCandidate.starred ? "★ 별표 표시됨" : "☆ 별표 등록"}</span>
+                      </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm font-bold text-slate-400 mt-2 md:mt-3">
                       <span className="flex items-center gap-1 md:gap-1.5"><MapPin className="w-3 h-3 md:w-4 md:h-4 text-blue-400" /> {selectedCandidate.country} / {selectedCandidate.agency}</span>
@@ -765,26 +959,262 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Media Links Section (Google Drive Video & Personality Test) */}
+                <div className="p-3 md:p-4 rounded-xl bg-[#051326] border border-[#1e3a5f] space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h5 className="font-black text-slate-200 text-xs md:text-sm flex items-center gap-2">
+                      <FolderSync className="w-3.5 h-3.5 text-blue-400" />
+                      구글 드라이브 평가 영상 및 인성검사 결과
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIndividualModal({
+                          isOpen: true,
+                          candidate: selectedCandidate,
+                          focus: 'all'
+                        })}
+                        className="text-[11px] font-black text-blue-300 hover:text-white px-2.5 py-1 rounded bg-blue-900/60 hover:bg-blue-600 border border-blue-500/40 transition-colors flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Edit2 className="w-3 h-3" /> 개인별 등록창 열기
+                      </button>
+                      {!isEditingMedia ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditVideoUrl(selectedCandidate.video_url || '');
+                            setEditTestUrl(selectedCandidate.test_url || '');
+                            setIsEditingMedia(true);
+                          }}
+                          className="text-[11px] font-bold text-slate-400 hover:text-blue-400 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-800 border border-slate-700 transition-colors flex items-center gap-1"
+                        >
+                          간편 수정
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingMedia(false)}
+                            className="text-[11px] font-bold text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 transition-colors"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingMedia}
+                            onClick={async () => {
+                              setIsSavingMedia(true);
+                              await updateCandidateMedia(selectedCandidate.uid, editVideoUrl.trim(), editTestUrl.trim());
+                              setSelectedCandidate({
+                                ...selectedCandidate,
+                                video_url: editVideoUrl.trim(),
+                                test_url: editTestUrl.trim()
+                              });
+                              setIsSavingMedia(false);
+                              setIsEditingMedia(false);
+                            }}
+                            className="text-[11px] font-black text-white px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 transition-colors flex items-center gap-1"
+                          >
+                            <Check className="w-3 h-3" /> 저장
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditingMedia ? (
+                    <div className="space-y-2.5 p-3 rounded-lg bg-[#0a1b35] border border-blue-500/30">
+                      <div>
+                        <label className="block text-[11px] font-bold text-blue-300 mb-1 flex items-center gap-1">
+                          <Video className="w-3 h-3 text-blue-400" /> 영상 구글 드라이브 공유 링크 (AF열)
+                        </label>
+                        <input
+                          type="text"
+                          value={editVideoUrl}
+                          onChange={(e) => setEditVideoUrl(e.target.value)}
+                          placeholder="https://drive.google.com/file/d/.../view"
+                          className="w-full bg-[#051326] border border-[#1e3a5f] rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-indigo-300 mb-1 flex items-center gap-1">
+                          <FileText className="w-3 h-3 text-indigo-400" /> 인성검사 결과 보고서 링크 (AG열)
+                        </label>
+                        <input
+                          type="text"
+                          value={editTestUrl}
+                          onChange={(e) => setEditTestUrl(e.target.value)}
+                          placeholder="https://drive.google.com/file/d/.../view"
+                          className="w-full bg-[#051326] border border-[#1e3a5f] rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Video card */}
+                      <div className="p-3 rounded-lg bg-[#0a1b35] border border-[#1e3a5f] flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                            <Video className="w-3.5 h-3.5 text-blue-400" />
+                            면접 인터뷰 영상 (AF열)
+                          </span>
+                          {selectedCandidate.video_url ? (
+                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                              연결됨
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                              미등록
+                            </span>
+                          )}
+                        </div>
+                        {selectedCandidate.video_url ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setMediaViewer({
+                                isOpen: true,
+                                title: `면접 영상`,
+                                candidateName: selectedCandidate.name,
+                                appNo: selectedCandidate.app_no,
+                                mediaType: 'video',
+                                url: selectedCandidate.video_url
+                              })}
+                              className="flex-1 py-1.5 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm"
+                            >
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>영상 바로 재생</span>
+                            </button>
+                            <a
+                              href={selectedCandidate.video_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                              title="구글 드라이브 새창"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditVideoUrl('');
+                              setEditTestUrl(selectedCandidate.test_url || '');
+                              setIsEditingMedia(true);
+                            }}
+                            className="py-1.5 text-xs font-bold text-slate-400 hover:text-blue-300 bg-slate-800/60 hover:bg-slate-800 rounded-lg transition-colors border border-dashed border-slate-700 text-center"
+                          >
+                            + 영상 링크 수기 등록
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Test card */}
+                      <div className="p-3 rounded-lg bg-[#0a1b35] border border-[#1e3a5f] flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                            인성검사 보고서 (AG열)
+                          </span>
+                          {selectedCandidate.test_url ? (
+                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                              연결됨
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                              미등록
+                            </span>
+                          )}
+                        </div>
+                        {selectedCandidate.test_url ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setMediaViewer({
+                                isOpen: true,
+                                title: `인성검사 보고서`,
+                                candidateName: selectedCandidate.name,
+                                appNo: selectedCandidate.app_no,
+                                mediaType: 'test',
+                                url: selectedCandidate.test_url
+                              })}
+                              className="flex-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm"
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span>보고서 PDF 열람</span>
+                            </button>
+                            <a
+                              href={selectedCandidate.test_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                              title="구글 드라이브 새창"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditVideoUrl(selectedCandidate.video_url || '');
+                              setEditTestUrl('');
+                              setIsEditingMedia(true);
+                            }}
+                            className="py-1.5 text-xs font-bold text-slate-400 hover:text-indigo-300 bg-slate-800/60 hover:bg-slate-800 rounded-lg transition-colors border border-dashed border-slate-700 text-center"
+                          >
+                            + 보고서 링크 수기 등록
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Memo section */}
-                {selectedCandidate.memo && (
-                  <div className="p-3 md:p-4 rounded-xl bg-[#051326] border border-[#1e3a5f]">
-                    <h5 className="font-black text-slate-300 text-xs md:text-sm mb-3 md:mb-4 flex items-center gap-2"><FileText className="w-3 h-3 md:w-4 md:h-4 text-slate-400" /> 특이사항 및 코멘트</h5>
-                    <p className="text-xs md:text-sm font-medium text-slate-300 leading-relaxed whitespace-pre-wrap bg-[#0a1b35] p-4 md:p-5 rounded-xl border border-[#1e3a5f]">
-                      {selectedCandidate.memo}
-                    </p>
+                {(selectedCandidate.interview_memo || selectedCandidate.memo || selectedCandidate.skill_memo) && (
+                  <div className="p-3 md:p-4 rounded-xl bg-[#051326] border border-[#1e3a5f] space-y-3">
+                    <h5 className="font-black text-slate-200 text-xs md:text-sm flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5 text-blue-400" /> 특이사항 및 인터뷰 코멘트
+                    </h5>
+                    {(selectedCandidate.interview_memo || selectedCandidate.memo) && (
+                      <div className="bg-[#0a1b35] p-3 md:p-3.5 rounded-xl border border-[#1e3a5f]">
+                        <p className="text-[11px] font-bold text-blue-300 mb-1 flex items-center gap-1">
+                          <Languages className="w-3 h-3 text-blue-400" /> 한국어 면접/인터뷰 특이사항 (AI열 / Q열)
+                        </p>
+                        <p className="text-xs md:text-sm font-medium text-slate-200 leading-relaxed whitespace-pre-wrap">
+                          {selectedCandidate.interview_memo || selectedCandidate.memo}
+                        </p>
+                      </div>
+                    )}
+                    {selectedCandidate.skill_memo && (
+                      <div className="bg-[#0a1b35] p-3 md:p-3.5 rounded-xl border border-[#1e3a5f]">
+                        <p className="text-[11px] font-bold text-emerald-300 mb-1 flex items-center gap-1">
+                          <Hammer className="w-3 h-3 text-hd-green" /> 기량 검증 실기 특이사항 (AJ열)
+                        </p>
+                        <p className="text-xs md:text-sm font-medium text-slate-200 leading-relaxed whitespace-pre-wrap">
+                          {selectedCandidate.skill_memo}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
               
               <div className="p-3 md:p-4 bg-[#051326] border-t border-[#1e3a5f] flex justify-end gap-3 md:gap-4">
-                <button onClick={() => setSelectedCandidate(null)} className="px-4 md:px-6 py-2 md:py-3 bg-[#0a1b35] hover:bg-[#1e3a5f] text-slate-300 font-bold rounded-xl transition-colors text-xs md:text-sm border border-[#1e3a5f]">닫기</button>
+                <button onClick={() => {
+                  setSelectedCandidate(null);
+                  setIsEditingMedia(false);
+                }} className="px-4 md:px-6 py-2 md:py-3 bg-[#0a1b35] hover:bg-[#1e3a5f] text-slate-300 font-bold rounded-xl transition-colors text-xs md:text-sm border border-[#1e3a5f]">닫기</button>
                 <button onClick={() => { 
                   if (selectedCandidate) {
                     setSelectedCandidateUid(selectedCandidate.uid);
                   }
                   setCurrentView('evaluation'); 
                   setSelectedCandidate(null); 
+                  setIsEditingMedia(false);
                 }} className="px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-[#003770] to-[#00a859] hover:from-[#004b99] hover:to-[#00c268] text-white font-black rounded-xl transition-all shadow-lg flex items-center gap-1.5 md:gap-2 text-xs md:text-sm">
                   해당 인원 평가하기 <ChevronRight className="w-3 h-3 md:w-4 md:h-4" />
                 </button>
@@ -793,6 +1223,41 @@ export default function Dashboard() {
           </div>
         );
       })()}
+
+      {/* Google Drive Media Auto-Sync Modal */}
+      <MediaLinkModal
+        isOpen={showMediaLinkModal}
+        onClose={() => setShowMediaLinkModal(false)}
+        defaultDate={selectedDates.length === 1 ? selectedDates[0] : undefined}
+      />
+
+      {/* Media Player / Document Viewer Modal */}
+      {mediaViewer && (
+        <MediaViewerModal
+          isOpen={mediaViewer.isOpen}
+          onClose={() => setMediaViewer(null)}
+          title={mediaViewer.title}
+          candidateName={mediaViewer.candidateName}
+          appNo={mediaViewer.appNo}
+          mediaType={mediaViewer.mediaType}
+          url={mediaViewer.url}
+        />
+      )}
+
+      {/* Individual Candidate Media Registration Modal */}
+      {individualModal.candidate && (
+        <IndividualMediaModal
+          isOpen={individualModal.isOpen}
+          onClose={() => setIndividualModal({ isOpen: false, candidate: null, focus: 'all' })}
+          candidate={individualModal.candidate}
+          initialFocus={individualModal.focus}
+          onUpdated={(updated) => {
+            if (selectedCandidate && (selectedCandidate.uid === updated.uid || selectedCandidate.app_no === updated.app_no)) {
+              setSelectedCandidate(updated);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -492,3 +492,148 @@ export function getBadgeHtml(type: string): string {
   }
   return '';
 }
+
+/**
+ * 파일명 또는 응시번호에서 매칭용 표준 정규화 키를 추출합니다.
+ * 사용자 요구사항:
+ * - KE-11, KE11, KE-011, KE011, KE-012, KE123 모두 대응
+ * - TM22, TM022, TM111, TM-022 모두 대응
+ * - "K-107 WASKITA EDUARD RASWANA.MOV"처럼 뒤에 이름, 공백, 오타가 있어도 맨 앞 "K-107"만 추출
+ * - 확장자(.mp4, .mov, .pdf 등) 무시
+ * - 결과: 접두사 대문자 + '-' + 정수 (예: KE-11, KE-12, TM-22, K-107)
+ */
+export function extractAppNoKey(raw: any): string | null {
+  if (raw === undefined || raw === null) return null;
+  let str = String(raw).trim();
+  if (!str) return null;
+
+  // 1. URL 형태인 경우 파일명 추출
+  if (str.includes('/')) {
+    const segments = str.split('/');
+    str = segments[segments.length - 1];
+  }
+
+  // 2. 확장자 제거 (예: .mp4, .mov, .MOV, .pdf, .PDF, .mkv, .avi 등)
+  str = str.replace(/\.[a-zA-Z0-9]{2,5}$/, '').trim();
+
+  // 3. 영문 접두사 + 선택적 기호/공백 + 숫자 + (뒤쪽 문자열 무시)
+  // 예: "K-107 WASKITA EDUARD" -> match[1]="K", match[2]="107"
+  // 예: "KE-012" -> match[1]="KE", match[2]="012"
+  // 예: "TM22" -> match[1]="TM", match[2]="22"
+  // 예: "TM-022" -> match[1]="TM", match[2]="022"
+  const prefixMatch = str.match(/^([a-zA-Z]+)\s*[-_.]*\s*0*(\d+)/);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1].toUpperCase();
+    const num = parseInt(prefixMatch[2], 10);
+    return `${prefix}-${num}`;
+  }
+
+  // 4. 순수 숫자로 시작하는 경우 (예: "012", "12 홍길동")
+  const numMatch = str.match(/^0*(\d+)/);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    return `NUM-${num}`;
+  }
+
+  // 5. 그 외 정규화 시도
+  const clean = str.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  return clean || null;
+}
+
+/**
+ * 구글 드라이브 파일 ID 추출
+ */
+export function getDriveFileId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+  const str = String(urlOrId).trim();
+  
+  // 이미 파일 ID만 있는 경우 (영문/숫자/하이픈/언더바 20자 이상)
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(str)) {
+    return str;
+  }
+
+  // https://drive.google.com/file/d/FILE_ID/view...
+  const matchD = str.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (matchD) return matchD[1];
+
+  // https://drive.google.com/open?id=FILE_ID
+  // https://drive.google.com/uc?id=FILE_ID
+  const matchId = str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (matchId) return matchId[1];
+
+  return null;
+}
+
+/**
+ * 구글 드라이브 폴더 ID 추출
+ */
+export function getDriveFolderId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+  const str = String(urlOrId).trim();
+
+  // 이미 폴더 ID 형태인 경우
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(str)) {
+    return str;
+  }
+
+  // https://drive.google.com/drive/folders/FOLDER_ID
+  // https://drive.google.com/drive/u/0/folders/FOLDER_ID
+  const match = str.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+
+  return null;
+}
+
+/**
+ * 구글 드라이브 동영상/문서 인라인 미리보기(Embed) URL 생성
+ */
+export function getDrivePreviewUrl(urlOrId: string): string {
+  const fileId = getDriveFileId(urlOrId);
+  if (fileId) {
+    return `https://drive.google.com/file/d/${fileId}/preview`;
+  }
+  return urlOrId;
+}
+
+/**
+ * 구글 드라이브 표준 공유/열람 URL 생성
+ */
+export function getDriveViewUrl(urlOrId: string): string {
+  const fileId = getDriveFileId(urlOrId);
+  if (fileId) {
+    return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+  }
+  return urlOrId;
+}
+
+/**
+ * 파일명이 동영상인지 여부 확인
+ */
+export function isVideoFilename(filename: string): boolean {
+  return /\.(mp4|mov|avi|wmv|mkv|webm|m4v|flv)$/i.test(filename.trim());
+}
+
+/**
+ * 파일명이 PDF/문서인지 여부 확인
+ */
+export function isPdfFilename(filename: string): boolean {
+  return /\.(pdf|doc|docx|hwp)$/i.test(filename.trim());
+}
+
+/**
+ * 천 단위 콤마 포맷팅 (예: 1111 -> "1,111")
+ */
+export function formatCount(n: number | string | null | undefined): string {
+  if (n === null || n === undefined || n === '') return '0';
+  const num = typeof n === 'number' ? n : Number(n);
+  if (isNaN(num)) return String(n);
+  return num.toLocaleString('ko-KR');
+}
+
+/**
+ * 인원수 포맷팅 (예: 1111 -> "1,111명")
+ */
+export function formatPeople(n: number | string | null | undefined): string {
+  return `${formatCount(n)}명`;
+}
+

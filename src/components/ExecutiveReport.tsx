@@ -45,7 +45,9 @@ import {
   determineResult, 
   getKoreanGrade, 
   getSkillGradeByScore,
-  isE9Candidate
+  isE9Candidate,
+  formatCount,
+  formatPeople
 } from '../lib/utils';
 
 // Register ChartJS components
@@ -80,7 +82,7 @@ const barDataLabelsPlugin = {
             ctx.fillStyle = '#0f172a';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
-            ctx.fillText(`${val}명`, x, Math.max(14, y - 3));
+            ctx.fillText(`${formatCount(val)}명`, x, Math.max(14, y - 3));
           }
         });
       }
@@ -1383,22 +1385,22 @@ export default function ExecutiveReport() {
                   {ag.jobs}
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden`}>
-                  {ag.total}명
+                  {formatPeople(ag.total)}
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono text-slate-800 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden`}>
-                  {ag.passPure}명
+                  {formatPeople(ag.passPure)}
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono text-slate-800 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden`}>
-                  {ag.passCond}명
+                  {formatPeople(ag.passCond)}
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono font-black text-[#002c5f] text-center border-r border-slate-200 bg-blue-50/50 whitespace-nowrap overflow-hidden`}>
-                  {ag.passPure + ag.passCond}명
+                  {formatPeople(ag.passPure + ag.passCond)}
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono font-black text-emerald-700 text-center border-r border-slate-200 bg-emerald-50/40 text-[12px] whitespace-nowrap overflow-hidden`}>
                   {ag.passTotalRate}%
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono text-center border-r border-slate-200 whitespace-nowrap overflow-hidden ${ag.fail > 0 ? 'text-slate-600' : 'text-slate-400'}`}>
-                  {ag.fail}명
+                  {formatPeople(ag.fail)}
                 </td>
                 <td className={`${rowPad} px-0.5 font-mono text-slate-700 text-center border-r border-slate-200 whitespace-nowrap overflow-hidden`}>
                   {ag.avgWeld > 0 ? `${ag.avgWeld}점` : '-'}
@@ -1421,22 +1423,22 @@ export default function ExecutiveReport() {
                 전 직종
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden`}>
-                {stats.total}명
+                {formatPeople(stats.total)}
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden`}>
-                {stats.passPureCount}명
+                {formatPeople(stats.passPureCount)}
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden`}>
-                {stats.passCondCount}명
+                {formatPeople(stats.passCondCount)}
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-[#002c5f] border-r border-slate-300 bg-blue-100/60 font-black whitespace-nowrap overflow-hidden`}>
-                {stats.passTotalCount}명
+                {formatPeople(stats.passTotalCount)}
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-emerald-800 border-r border-slate-300 bg-emerald-100/70 text-[12px] font-black whitespace-nowrap overflow-hidden`}>
                 {stats.passTotalRate}%
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-slate-700 border-r border-slate-300 font-medium whitespace-nowrap overflow-hidden`}>
-                {stats.failCount}명
+                {formatPeople(stats.failCount)}
               </td>
               <td className={`${rowPad} px-0.5 font-mono text-center text-slate-900 border-r border-slate-300 font-bold whitespace-nowrap overflow-hidden`}>
                 {stats.avgWeld}점
@@ -1462,7 +1464,7 @@ export default function ExecutiveReport() {
           <BarChart3 className="w-3.5 h-3.5 text-emerald-700" /> VI. {reportType === '사전기량검증' ? '사전' : reportType === '본기량검증' ? '본' : ''} 기량검증 합격자(조건부 포함) 세부 결과
         </h3>
         <span className="text-[10.5px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-          합격 인원 총 {passedAgeDetail.total}명 대상
+          합격 인원 총 {formatPeople(passedAgeDetail.total)} 대상
         </span>
       </div>
 
@@ -1499,7 +1501,7 @@ export default function ExecutiveReport() {
           </table>
         </div>
         <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
-          * 20대(19~29세) 청년층 비중 {passedAgeDetail.total > 0 ? Math.round(((passedAgeDetail.g19_24 + passedAgeDetail.g25_29) / passedAgeDetail.total) * 1000) / 10 : 0}% ({passedAgeDetail.g19_24 + passedAgeDetail.g25_29}명) 확보로 장기 근속 및 현장 적응력 우수.
+          * 20대(19~29세) 청년층 비중 {passedAgeDetail.total > 0 ? Math.round(((passedAgeDetail.g19_24 + passedAgeDetail.g25_29) / passedAgeDetail.total) * 1000) / 10 : 0}% ({formatPeople(passedAgeDetail.g19_24 + passedAgeDetail.g25_29)}) 확보로 장기 근속 및 현장 적응력 우수.
         </p>
       </div>
 
@@ -1662,7 +1664,7 @@ export default function ExecutiveReport() {
           </table>
         </div>
         <p className="text-[9.5px] text-slate-500 font-medium leading-tight">
-          * E-9 비자 경력 합격자 총 {passedE9SkillGradeDetail.weld.total + passedE9SkillGradeDetail.fit.total}명(선발 인원의 {passedAgeDetail.total > 0 ? Math.round(((passedE9SkillGradeDetail.weld.total + passedE9SkillGradeDetail.fit.total) / passedAgeDetail.total) * 1000) / 10 : 0}%)의 직종별 기량 분포.
+          * E-9 비자 경력 합격자 총 {formatPeople(passedE9SkillGradeDetail.weld.total + passedE9SkillGradeDetail.fit.total)}(선발 인원의 {passedAgeDetail.total > 0 ? Math.round(((passedE9SkillGradeDetail.weld.total + passedE9SkillGradeDetail.fit.total) / passedAgeDetail.total) * 1000) / 10 : 0}%)의 직종별 기량 분포.
         </p>
       </div>
 
@@ -1693,10 +1695,10 @@ export default function ExecutiveReport() {
                 <tr key={ag.agency}>
                   <td className={`${rowPad} px-1 font-bold text-slate-900 border-r border-slate-200 bg-slate-50/60 text-center whitespace-nowrap`}>{ag.agency}</td>
                   <td className={`${rowPad} px-0.5 font-bold text-slate-800 border-r border-slate-200 bg-slate-50/40 text-center whitespace-nowrap text-xs`}>{ag.country}</td>
-                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900 whitespace-nowrap`}>{ag.totalPass}명</td>
-                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold whitespace-nowrap`}>{ag.purePass}명 ({ag.pureRatio}%)</td>
-                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-purple-800 whitespace-nowrap`}>{ag.condPass}명</td>
-                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-amber-800 font-bold whitespace-nowrap`}>{ag.e9Pass}명 ({ag.e9Ratio}%)</td>
+                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 font-bold text-slate-900 whitespace-nowrap`}>{formatPeople(ag.totalPass)}</td>
+                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-blue-900 font-bold whitespace-nowrap`}>{formatPeople(ag.purePass)} ({ag.pureRatio}%)</td>
+                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-purple-800 whitespace-nowrap`}>{formatPeople(ag.condPass)}</td>
+                  <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-amber-800 font-bold whitespace-nowrap`}>{formatPeople(ag.e9Pass)} ({ag.e9Ratio}%)</td>
                   <td className={`${rowPad} px-0.5 font-mono border-r border-slate-200 text-slate-800 whitespace-nowrap`}>{ag.avgWeld > 0 ? `${ag.avgWeld}점` : '-'}</td>
                   <td className={`${rowPad} px-0.5 font-mono text-slate-800 whitespace-nowrap`}>{ag.avgKorean > 0 ? `${ag.avgKorean}점` : '-'}</td>
                 </tr>
@@ -1895,7 +1897,7 @@ export default function ExecutiveReport() {
                             <span>{date}</span>
                           </div>
                           <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 font-mono">
-                            {count}명
+                            {formatPeople(count)}
                           </span>
                         </label>
                       );
@@ -1997,7 +1999,7 @@ export default function ExecutiveReport() {
                             <span className="truncate">{agency}</span>
                           </div>
                           <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 font-mono">
-                            {count}명
+                            {formatPeople(count)}
                           </span>
                         </label>
                       );
@@ -2171,10 +2173,10 @@ export default function ExecutiveReport() {
                         총 검증 인원
                       </th>
                       <td className="py-3 px-4 text-center font-semibold text-slate-900 leading-normal">
-                        <span className="font-mono font-bold text-base text-slate-900">총 {stats.total}명</span>
+                        <span className="font-mono font-bold text-base text-slate-900">총 {formatPeople(stats.total)}</span>
                         {agencyStats.length > 0 && (
                           <span className="text-xs font-semibold text-slate-600 ml-2 font-sans">
-                            ({agencyStats.map(ag => `${ag.name} ${ag.total}명`).join(', ')})
+                            ({agencyStats.map(ag => `${ag.name} ${formatPeople(ag.total)}`).join(', ')})
                           </span>
                         )}
                       </td>
@@ -2184,7 +2186,7 @@ export default function ExecutiveReport() {
                         합격인원
                       </th>
                       <td className="py-3 px-4 text-center font-bold text-blue-900">
-                        총 {stats.passTotalCount}명 <span className="text-xs font-semibold text-slate-600">(최종 {stats.passPureCount}명 + 조건부 {stats.passCondCount}명)</span>
+                        총 {formatPeople(stats.passTotalCount)} <span className="text-xs font-semibold text-slate-600">(최종 {formatPeople(stats.passPureCount)} + 조건부 {formatPeople(stats.passCondCount)})</span>
                       </td>
                     </tr>
                     <tr>
@@ -2258,12 +2260,12 @@ export default function ExecutiveReport() {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-center flex flex-col justify-between">
                   <div className="text-[11.5px] font-bold text-slate-700 whitespace-nowrap">총 검증인원</div>
                   <div className="text-2xl font-black text-slate-900 my-0.5">
-                    {stats.total} <span className="text-xs font-bold text-slate-500">명</span>
+                    {formatCount(stats.total)} <span className="text-xs font-bold text-slate-500">명</span>
                   </div>
                   <div className="text-[10.5px] text-slate-600 font-semibold space-y-0.5 leading-tight">
-                    <div className="whitespace-nowrap">응시 총원 {stats.total}명 ({agencyStats.length}개사)</div>
+                    <div className="whitespace-nowrap">응시 총원 {formatPeople(stats.total)} ({agencyStats.length}개사)</div>
                     <div className="text-slate-500 font-medium whitespace-nowrap">
-                      용접 {stats.weldTotal}명 / 취부 {stats.fitTotal}명
+                      용접 {formatPeople(stats.weldTotal)} / 취부 {formatPeople(stats.fitTotal)}
                     </div>
                   </div>
                 </div>
@@ -2272,11 +2274,11 @@ export default function ExecutiveReport() {
                 <div className="bg-emerald-50/80 border border-emerald-300 rounded-xl p-2.5 text-center flex flex-col justify-between">
                   <div className="text-[11.5px] font-bold text-emerald-900 whitespace-nowrap">합격인원</div>
                   <div className="text-2xl font-black text-emerald-700 my-0.5">
-                    {stats.passTotalCount} <span className="text-xs font-bold text-emerald-600">명</span>
+                    {formatCount(stats.passTotalCount)} <span className="text-xs font-bold text-emerald-600">명</span>
                   </div>
                   <div className="text-[10.5px] text-emerald-800 font-bold space-y-0.5 leading-tight">
                     <div className="whitespace-nowrap text-emerald-900 font-black">선발률 {stats.passTotalRate}%</div>
-                    <div className="text-emerald-700 font-medium whitespace-nowrap">최종 {stats.passPureCount} + 조건부 {stats.passCondCount}</div>
+                    <div className="text-emerald-700 font-medium whitespace-nowrap">최종 {formatCount(stats.passPureCount)} + 조건부 {formatCount(stats.passCondCount)}</div>
                   </div>
                 </div>
 
@@ -2284,7 +2286,7 @@ export default function ExecutiveReport() {
                 <div className="bg-blue-50/80 border border-blue-300 rounded-xl p-2.5 text-center flex flex-col justify-between">
                   <div className="text-[11.5px] font-bold text-blue-900 whitespace-nowrap">기량평가 합격인원</div>
                   <div className="text-2xl font-black text-blue-800 my-0.5">
-                    {stats.skillPassCount} <span className="text-xs font-bold text-blue-600">명</span>
+                    {formatCount(stats.skillPassCount)} <span className="text-xs font-bold text-blue-600">명</span>
                   </div>
                   <div className="text-[10.5px] text-blue-800 font-bold space-y-0.5 leading-tight">
                     <div className="whitespace-nowrap text-blue-900 font-black">기량 통과율 {stats.skillPassRate}%</div>
@@ -2296,7 +2298,7 @@ export default function ExecutiveReport() {
                 <div className="bg-purple-50/80 border border-purple-300 rounded-xl p-2.5 text-center flex flex-col justify-between">
                   <div className="text-[11.5px] font-bold text-purple-900 whitespace-nowrap">한국어 말하기 합격인원</div>
                   <div className="text-2xl font-black text-purple-800 my-0.5">
-                    {stats.koreanPassCount} <span className="text-xs font-bold text-purple-600">명</span>
+                    {formatCount(stats.koreanPassCount)} <span className="text-xs font-bold text-purple-600">명</span>
                   </div>
                   <div className="text-[10.5px] text-purple-800 font-bold space-y-0.5 leading-tight">
                     <div className="whitespace-nowrap text-purple-900 font-black">소통 적격률 {stats.koreanPassRate}%</div>
@@ -2330,21 +2332,21 @@ export default function ExecutiveReport() {
                       <div className="text-[10.5px] font-extrabold flex items-center gap-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#002c5f]"></span>최종
                       </div>
-                      <div className="text-[11.5px] font-black mt-0.5">{stats.passPureCount}명</div>
+                      <div className="text-[11.5px] font-black mt-0.5">{formatPeople(stats.passPureCount)}</div>
                       <div className="text-[9.5px] font-medium text-slate-500">({stats.passPureRate}%)</div>
                     </div>
                     <div className="bg-emerald-50 text-[#00a859] py-1 px-0.5 rounded-lg border-2 border-[#00a859] flex flex-col justify-center items-center">
                       <div className="text-[10.5px] font-extrabold flex items-center gap-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#00a859]"></span>조건부
                       </div>
-                      <div className="text-[11.5px] font-black mt-0.5">{stats.passCondCount}명</div>
+                      <div className="text-[11.5px] font-black mt-0.5">{formatPeople(stats.passCondCount)}</div>
                       <div className="text-[9.5px] font-medium text-emerald-700">({stats.passCondRate}%)</div>
                     </div>
                     <div className="bg-red-50 text-red-700 py-1 px-0.5 rounded-lg border-2 border-[#ef4444] flex flex-col justify-center items-center">
                       <div className="text-[10.5px] font-extrabold flex items-center gap-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>불합격
                       </div>
-                      <div className="text-[11.5px] font-black mt-0.5">{stats.failCount}명</div>
+                      <div className="text-[11.5px] font-black mt-0.5">{formatPeople(stats.failCount)}</div>
                       <div className="text-[9.5px] font-medium text-red-500">({stats.failRate}%)</div>
                     </div>
                   </div>
@@ -2355,7 +2357,7 @@ export default function ExecutiveReport() {
                   <div className="flex justify-between items-center">
                     <span className="text-[11.5px] font-bold text-slate-700">기량 실기 등급별 인원 분포</span>
                     <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      실기 통과 {stats.skillPassCount}명 / 탈락 {stats.total - stats.skillPassCount}명
+                      실기 통과 {formatPeople(stats.skillPassCount)} / 탈락 {formatPeople(stats.total - stats.skillPassCount)}
                     </span>
                   </div>
 
@@ -2382,7 +2384,7 @@ export default function ExecutiveReport() {
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-700" /> III. 평가자 종합 의견
                 </h3>
                 <span className="text-[10.5px] text-slate-500 font-semibold">
-                  총 {stats.total}명 중 가용 인력 {stats.passTotalCount}명 선발 ({stats.passTotalRate}%)
+                  총 {formatPeople(stats.total)} 중 가용 인력 {formatPeople(stats.passTotalCount)} 선발 ({stats.passTotalRate}%)
                 </span>
               </div>
 
@@ -2408,13 +2410,13 @@ export default function ExecutiveReport() {
                         <div className="flex items-start gap-1">
                           <span className="text-purple-700 font-bold shrink-0">•</span>
                           <span>
-                            <strong>소통 적격자({stats.koreanPassCount}명, {stats.koreanPassRate}%):</strong> E-9 비자 경력자({evaluatorOpinionStats.e9Count}명) 등을 포함한 통과 인원은 B~C등급 위주로 현장 직무 지시 및 기본 안전 소통이 가능함.
+                            <strong>소통 적격자({formatPeople(stats.koreanPassCount)}, {stats.koreanPassRate}%):</strong> E-9 비자 경력자({formatPeople(evaluatorOpinionStats.e9Count)}) 등을 포함한 통과 인원은 B~C등급 위주로 현장 직무 지시 및 기본 안전 소통이 가능함.
                           </span>
                         </div>
                         <div className="flex items-start gap-1">
                           <span className="text-purple-700 font-bold shrink-0">•</span>
                           <span>
-                            <strong>조건부 선발({stats.passCondCount}명):</strong> 실기 기량은 기준을 충족하였으나 기초 회화가 미흡한 인원(D·E등급)은 현장 인력 수급과 기량 우수성을 고려하여 조건부 선발함.
+                            <strong>조건부 선발({formatPeople(stats.passCondCount)}):</strong> 실기 기량은 기준을 충족하였으나 기초 회화가 미흡한 인원(D·E등급)은 현장 인력 수급과 기량 우수성을 고려하여 조건부 선발함.
                           </span>
                         </div>
                       </td>
@@ -2438,13 +2440,13 @@ export default function ExecutiveReport() {
                         <div className="flex items-start gap-1">
                           <span className="text-blue-700 font-bold shrink-0">•</span>
                           <span>
-                            <strong>실기 기량 충족({stats.skillPassCount}명, {stats.skillPassRate}%):</strong> 용접({stats.weldPassCount}/{stats.weldTotal}명, 평균 {stats.avgWeld}점) 및 취부({stats.fitPassCount}/{stats.fitTotal}명, 평균 {stats.avgFit > 0 ? `${stats.avgFit}점` : '-'}) 전반에서 B등급 이상의 작업 숙련도를 확인하여 현장 표준 작업 기준을 충족함.
+                            <strong>실기 기량 충족({formatPeople(stats.skillPassCount)}, {stats.skillPassRate}%):</strong> 용접({formatCount(stats.weldPassCount)}/{formatPeople(stats.weldTotal)}, 평균 {stats.avgWeld}점) 및 취부({formatCount(stats.fitPassCount)}/{formatPeople(stats.fitTotal)}, 평균 {stats.avgFit > 0 ? `${stats.avgFit}점` : '-'}) 전반에서 B등급 이상의 작업 숙련도를 확인하여 현장 표준 작업 기준을 충족함.
                           </span>
                         </div>
                         <div className="flex items-start gap-1">
                           <span className="text-blue-700 font-bold shrink-0">•</span>
                           <span>
-                            <strong>기준 미달자 관리({stats.total - stats.skillPassCount}명):</strong> 도면 독해 미숙 또는 용접 결함(비드 외관, 언더컷 등)으로 실기 기준에 미달한 인원은 불합격 처리하고 송출사를 통한 기술 보완 후 재응시를 권고함.
+                            <strong>기준 미달자 관리({formatPeople(stats.total - stats.skillPassCount)}):</strong> 도면 독해 미숙 또는 용접 결함(비드 외관, 언더컷 등)으로 실기 기준에 미달한 인원은 불합격 처리하고 송출사를 통한 기술 보완 후 재응시를 권고함.
                           </span>
                         </div>
                       </td>

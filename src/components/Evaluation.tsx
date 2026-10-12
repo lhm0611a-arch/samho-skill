@@ -20,7 +20,12 @@ import {
   MessagesSquare,
   UserCheck,
   Volume2,
+  Video,
+  FileText,
+  Play,
+  Star
 } from "lucide-react";
+import { MediaViewerModal } from "./MediaViewerModal";
 import { useAppContext } from "../context/AppContext";
 import {
   CRITERIA,
@@ -59,6 +64,7 @@ export default function Evaluation() {
     fetchData,
     selectedCandidateUid,
     setSelectedCandidateUid,
+    toggleCandidateStar,
   } = useAppContext();
 
   const [filterType, setFilterType] = useState("all");
@@ -86,10 +92,19 @@ export default function Evaluation() {
   const [kVals, setKVals] = useState<number[]>([2, 2, 2, 2, 2, 2]);
   const [sWeld, setSWeld] = useState<string>("");
   const [sFit, setSFit] = useState<string>("");
-  const [sMemo, setSMemo] = useState<string>("");
+  const [interviewMemo, setInterviewMemo] = useState<string>("");
+  const [skillMemo, setSkillMemo] = useState<string>("");
   const [showCompleted, setShowCompleted] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [evalMediaViewer, setEvalMediaViewer] = useState<{
+    isOpen: boolean;
+    title: string;
+    candidateName?: string;
+    appNo?: string;
+    mediaType: "video" | "test";
+    url: string;
+  } | null>(null);
 
   const showToast = (message: string, type: "success" | "info" | "error" = "success") => {
     setToast({ message, type });
@@ -489,7 +504,8 @@ export default function Evaluation() {
     setKVals(loadedKVals);
     setSWeld(p.s_score_weld ? String(p.s_score_weld) : "");
     setSFit(p.s_score_fit ? String(p.s_score_fit) : "");
-    setSMemo(p.memo || "");
+    setInterviewMemo(p.interview_memo || p.memo || "");
+    setSkillMemo(p.skill_memo || "");
 
     // Generate candidate questions (초급 10 / 중급 10 / 고급 10)
     const initialShuffleCount = shuffleSeeds[p.uid] || 0;
@@ -658,6 +674,8 @@ export default function Evaluation() {
       p.k_pass = getKoreanPassText(checkKoreanPass(p));
       p.avg_detailed = avgDetailed;
       p.k_status = "완료";
+      p.interview_memo = interviewMemo;
+      p.memo = interviewMemo; // 한국어 인터뷰 종합 의견 및 특이사항
       saveMode = "korean";
       setGlobalLogs(newLogs);
       try {
@@ -679,7 +697,7 @@ export default function Evaluation() {
       p.grade_weld = getSkillGradeByScore(wV);
       p.s_score_fit = fV;
       p.grade_fit = getSkillGradeByScore(fV);
-      p.memo = sMemo;
+      p.skill_memo = skillMemo;
       p.s_status = "완료";
       saveMode = "skill";
     }
@@ -825,6 +843,9 @@ export default function Evaluation() {
           skill_status: String(p.s_status || "완료"),
           memo: String(p.memo || ""),
           s_memo: String(p.memo || ""),
+          interview_memo: String(p.interview_memo || p.memo || ""),
+          skill_memo: String(p.skill_memo || ""),
+          starred: !!p.starred,
           result: String(p.result || "대기"),
           details: [q1, q2, q3, q4, q5, q6],
           details_str: JSON.stringify([q1, q2, q3, q4, q5, q6]),
@@ -917,6 +938,9 @@ export default function Evaluation() {
         localStorage.setItem("hd_logs", JSON.stringify(newLogs));
       } catch (e) {}
       setKVals([2, 2, 2, 2, 2, 2]);
+      p.interview_memo = "";
+      p.memo = "";
+      setInterviewMemo("");
 
       // If skill evaluation is also not done, reset eval_date completely
       if (!isSkillStillDone) {
@@ -927,11 +951,11 @@ export default function Evaluation() {
       p.grade_weld = "-";
       p.s_score_fit = 0;
       p.grade_fit = "-";
-      p.memo = "";
+      p.skill_memo = "";
       p.s_status = "대기";
       setSWeld("");
       setSFit("");
-      setSMemo("");
+      setSkillMemo("");
 
       // If korean evaluation is also not done, reset eval_date completely
       if (!isKoreanStillDone) {
@@ -1249,7 +1273,8 @@ export default function Evaluation() {
                   statusTag = " (한국어대기 / 기량완료)";
                 }
 
-                const label = `[${c.app_no}] ${c.name?.toUpperCase()}${statusTag}`;
+                const starPrefix = c.starred ? "★ " : "";
+                const label = `${starPrefix}[${c.app_no}] ${c.name?.toUpperCase()}${statusTag}`;
                 return (
                   <option key={`${c.uid || c.app_no}_${idx}`} value={c.uid}>
                     {label}
@@ -1266,13 +1291,39 @@ export default function Evaluation() {
         {/* Row 2: Selected Candidate Full Profile Information Banner (No text truncation, fully responsive) */}
         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3 bg-[#08172c] border border-[#1e3a5f] rounded-xl px-3 sm:px-4 py-2 text-xs shadow-inner">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
-            {/* 수험번호 & 성명 */}
+            {/* 수험번호 & 성명 & 별표 (특이사항/관심 인원) */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {currentCandidate && (
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await toggleCandidateStar(currentCandidate.uid);
+                    showToast(
+                      currentCandidate.starred
+                        ? `[${currentCandidate.name}] 별표 표시가 해제되었습니다.`
+                        : `[${currentCandidate.name}] 별표가 지정되었습니다. 대시보드에 표시됩니다.`,
+                      "success"
+                    );
+                  }}
+                  className={`p-1 rounded-md transition-all flex items-center justify-center cursor-pointer ${
+                    currentCandidate.starred
+                      ? "text-amber-400 bg-amber-400/20 border border-amber-400/50 shadow-sm"
+                      : "text-slate-500 hover:text-amber-400 hover:bg-slate-800 border border-transparent"
+                  }`}
+                  title={currentCandidate.starred ? "별표 해제 (클릭)" : "별표 지정 (클릭 시 대시보드 표시)"}
+                >
+                  <Star className={`w-4 h-4 ${currentCandidate.starred ? "fill-amber-400" : ""}`} />
+                </button>
+              )}
               <span className="text-blue-400 font-black bg-blue-950/70 border border-blue-800 px-1.5 py-0.5 rounded text-[11px] font-mono">
                 {currentCandidate?.app_no || "-"}
               </span>
-              <span className="font-black text-white text-xs sm:text-sm tracking-wide">
+              <span className="font-black text-white text-xs sm:text-sm tracking-wide flex items-center gap-1">
                 {currentCandidate?.name?.toUpperCase() || "선택된 응시자 없음"}
+                {currentCandidate?.starred && (
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0 inline" />
+                )}
               </span>
             </div>
 
@@ -1357,8 +1408,46 @@ export default function Evaluation() {
             )}
           </div>
 
-          {/* 검증 구분 배지 */}
+          {/* 검증 구분 배지 및 미디어 열람 */}
           <div className="flex items-center gap-2 shrink-0">
+            {currentCandidate?.video_url && (
+              <button
+                type="button"
+                onClick={() => setEvalMediaViewer({
+                  isOpen: true,
+                  title: `면접 영상`,
+                  candidateName: currentCandidate.name,
+                  appNo: currentCandidate.app_no,
+                  mediaType: 'video',
+                  url: currentCandidate.video_url!
+                })}
+                className="px-2 py-0.5 rounded bg-blue-900/60 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 text-[11px] font-black transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                title="인터뷰 영상 바로보기"
+              >
+                <Play className="w-2.5 h-2.5 fill-current" />
+                <span>영상 열람</span>
+              </button>
+            )}
+
+            {currentCandidate?.test_url && (
+              <button
+                type="button"
+                onClick={() => setEvalMediaViewer({
+                  isOpen: true,
+                  title: `인성검사 결과 보고서`,
+                  candidateName: currentCandidate.name,
+                  appNo: currentCandidate.app_no,
+                  mediaType: 'test',
+                  url: currentCandidate.test_url!
+                })}
+                className="px-2 py-0.5 rounded bg-indigo-900/60 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 text-[11px] font-black transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                title="인성검사 결과 보고서 열람"
+              >
+                <FileText className="w-2.5 h-2.5" />
+                <span>인성검사 열람</span>
+              </button>
+            )}
+
             {currentCandidate && (
               <span
                 dangerouslySetInnerHTML={{
@@ -1824,6 +1913,49 @@ export default function Evaluation() {
                       </div>
                     );
                   })}
+
+                  {/* 한국어 면접 종합 의견 및 특이사항 입력 영역 */}
+                  <div className="bg-[#08172c] border border-[#1e3a5f] p-3.5 sm:p-4 rounded-xl shadow-sm mt-1">
+                    <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+                      <label className="flex text-xs sm:text-sm md:text-base font-black text-blue-300 items-center gap-2">
+                        <PenTool className="w-4 h-4 text-blue-400 shrink-0" /> 한국어 인터뷰 종합 의견 및 특이사항
+                        <span className="text-[10px] sm:text-[11px] font-normal text-slate-400">
+                          (실제 인터뷰 소견 및 주요 특이사항 기록)
+                        </span>
+                      </label>
+                      
+                      {currentCandidate && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await toggleCandidateStar(currentCandidate.uid);
+                            showToast(
+                              currentCandidate.starred
+                                ? `[${currentCandidate.name}] 별표 표시가 해제되었습니다.`
+                                : `[${currentCandidate.name}] 별표가 지정되었습니다. 대시보드에 표시됩니다.`,
+                              "success"
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm border active:scale-95 ${
+                            currentCandidate.starred
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30 shadow-amber-950/50"
+                              : "bg-slate-800 text-slate-400 border-slate-700 hover:text-amber-300 hover:border-amber-500/40"
+                          }`}
+                          title="별표 등록/해제"
+                        >
+                          <Star className={`w-3.5 h-3.5 ${currentCandidate.starred ? "fill-amber-400 text-amber-400" : "text-slate-400"}`} />
+                          <span>{currentCandidate.starred ? "★ 별표 등록됨" : "☆ 별표 등록"}</span>
+                        </button>
+                      )}
+                    </div>
+                    
+                    <textarea
+                      value={interviewMemo}
+                      onChange={(e) => setInterviewMemo(e.target.value)}
+                      className="dx-input w-full h-24 sm:h-28 resize-none text-xs sm:text-sm font-medium bg-[#051326] border-[#1e3a5f] text-slate-100 p-3 sm:p-3.5 rounded-xl placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 leading-relaxed"
+                      placeholder="면접관의 종합 평가 의견 및 특이사항을 입력해주세요. (예: 한국어 일상 회화 우수, 한국 조선소 근무 이력 및 현장 적응력 뛰어남 등)"
+                    ></textarea>
+                  </div>
                 </div>
               ) : (
                 <div className="p-4 md:p-6 pb-20 md:pb-24 flex flex-col items-center">
@@ -1911,14 +2043,14 @@ export default function Evaluation() {
 
                   <div className="w-full max-w-2xl mt-6 md:mt-8">
                     <label className="flex text-sm md:text-base font-black text-slate-200 mb-2 md:mb-3 items-center gap-2">
-                      <PenTool className="w-4 h-4 md:w-5 md:h-5 text-blue-400" /> 종합 의견 및
-                      특이사항
+                      <PenTool className="w-4 h-4 md:w-5 md:h-5 text-hd-green" /> 기량 검증 추가 특이사항
+                      <span className="text-xs font-normal text-slate-400">(필요 시 선택 입력)</span>
                     </label>
                     <textarea
-                      value={sMemo}
-                      onChange={(e) => setSMemo(e.target.value)}
-                      className="dx-input h-32 md:h-40 resize-none text-sm md:text-base font-medium bg-[#051326] border-[#1e3a5f] text-slate-200 p-4 md:p-5 rounded-xl placeholder-slate-600"
-                      placeholder="면접관의 상세한 의견을 기록해주세요. (예: 체력이 우수함, 도면 이해도가 부족함 등)"
+                      value={skillMemo}
+                      onChange={(e) => setSkillMemo(e.target.value)}
+                      className="dx-input h-28 md:h-36 resize-none text-sm md:text-base font-medium bg-[#051326] border-[#1e3a5f] text-slate-200 p-4 md:p-5 rounded-xl placeholder-slate-600 focus:border-emerald-500"
+                      placeholder="기량 검증 실기 테스트 관련 특이사항이 있을 경우 입력하세요. (예: 용접 비드 양호하나 속도 다소 느림 등 - 필요 시 입력)"
                     ></textarea>
                   </div>
                 </div>
@@ -1981,6 +2113,19 @@ export default function Evaluation() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Media Viewer Modal */}
+      {evalMediaViewer && (
+        <MediaViewerModal
+          isOpen={evalMediaViewer.isOpen}
+          onClose={() => setEvalMediaViewer(null)}
+          title={evalMediaViewer.title}
+          candidateName={evalMediaViewer.candidateName}
+          appNo={evalMediaViewer.appNo}
+          mediaType={evalMediaViewer.mediaType}
+          url={evalMediaViewer.url}
+        />
       )}
     </div>
   );

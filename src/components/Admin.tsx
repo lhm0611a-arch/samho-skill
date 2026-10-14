@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Database, Trash2, CheckCircle, Save, Sparkles, Loader2, FileSpreadsheet, Settings, Code2, Copy, FileDown, Check, FolderSync } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { MediaLinkModal } from './MediaLinkModal';
+import { GasUpdateModal } from './GasUpdateModal';
 import { LATEST_GAS_SCRIPT } from '../lib/gasTemplate';
 import * as XLSX from 'xlsx';
 import { 
@@ -566,57 +567,10 @@ export default function Admin() {
                     </div>
                 </div>
             )}
-            {showGasCodeModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
-                    <div className="bg-[#08172c] border border-[#1e3a5f] rounded-2xl p-6 w-full max-w-4xl shadow-2xl relative my-8 flex flex-col max-h-[85vh]">
-                        <div className="flex items-center justify-between pb-4 border-b border-[#1e3a5f]">
-                            <h3 className="text-xl font-black text-slate-100 flex items-center gap-3">
-                                <Code2 className="w-6 h-6 text-indigo-400" /> Google Apps Script (GAS) 최신 연동 코드
-                            </h3>
-                            <button
-                                onClick={() => setShowGasCodeModal(false)}
-                                className="text-slate-400 hover:text-white px-3 py-1 rounded-lg bg-slate-800 text-sm font-bold"
-                            >
-                                닫기
-                            </button>
-                        </div>
-                        <div className="py-3 text-xs text-slate-300 bg-indigo-950/40 border border-indigo-500/30 rounded-xl px-4 my-3 space-y-1">
-                            <p className="font-bold text-indigo-200">💡 구글 시트 배포 방법:</p>
-                            <p>1. 구글 스프레드시트 메뉴에서 <strong>[확장 프로그램] → [Apps Script]</strong>를 엽니다.</p>
-                            <p>2. 아래 코드를 전체 복사하여 <code className="text-amber-300 font-mono">코드.gs</code>에 붙여넣고 저장합니다.</p>
-                            <p>3. 상단 <strong>[배포] → [새 배포]</strong> (또는 배포 관리에서 새 버전) 선택 후 유형을 <strong>웹 앱(Web App)</strong>으로 지정하고, 액세스 권한을 <strong>'모든 사용자(Anyone)'</strong>로 설정하여 배포합니다.</p>
-                            <p>4. 생성된 웹 앱 URL을 복사하여 위 <strong>[Google Apps Script URL 동기화]</strong> 입력창에 붙여넣고 저장합니다.</p>
-                        </div>
-                        <div className="relative flex-1 min-h-[300px] overflow-hidden rounded-xl border border-[#1e3a5f] bg-[#030f1c]">
-                            <button
-                                onClick={() => {
-                                    const codeEl = document.getElementById("gas-code-content");
-                                    if (codeEl) {
-                                        navigator.clipboard.writeText(codeEl.innerText);
-                                        setCopiedCode(true);
-                                        setTimeout(() => setCopiedCode(false), 2000);
-                                    }
-                                }}
-                                className="absolute top-3 right-3 z-10 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black px-4 py-2 rounded-lg shadow-lg flex items-center gap-1.5 transition-all"
-                            >
-                                {copiedCode ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-                                {copiedCode ? "복사 완료!" : "전체 코드 복사"}
-                            </button>
-                            <pre id="gas-code-content" className="p-4 text-xs font-mono text-slate-200 overflow-y-auto h-[350px] custom-scrollbar select-all leading-relaxed whitespace-pre">
-{LATEST_GAS_SCRIPT}
-                            </pre>
-                        </div>
-                        <div className="flex justify-end pt-4 border-t border-[#1e3a5f] mt-4">
-                            <button
-                                onClick={() => setShowGasCodeModal(false)}
-                                className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-6 py-2.5 rounded-xl transition-all"
-                            >
-                                닫기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <GasUpdateModal
+                isOpen={showGasCodeModal}
+                onClose={() => setShowGasCodeModal(false)}
+            />
 
             {/* Google Drive Media Auto-Link Modal */}
             <MediaLinkModal

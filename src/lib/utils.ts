@@ -637,3 +637,17 @@ export function formatPeople(n: number | string | null | undefined): string {
   return `${formatCount(n)}명`;
 }
 
+/**
+ * 업체명에 따라 트랙 자동 판정:
+ * koica, 코이카, 세랑, serang -> "공공기관"
+ * 그 외 일반 업체명 -> "민간업체"
+ */
+export function computeAgencyTrack(agency?: string): '공공기관' | '민간업체' {
+  if (!agency) return '민간업체';
+  const s = String(agency).toLowerCase().replace(/\s+/g, '');
+  if (s.includes('koica') || s.includes('코이카') || s.includes('세랑') || s.includes('serang')) {
+    return '공공기관';
+  }
+  return '민간업체';
+}
+

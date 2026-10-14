@@ -16,14 +16,60 @@ function doGet(e) {
       var sh = ss.getSheetByName(name);
       if (sh) return sh;
       var sheets = ss.getSheets();
-      var target = name.replace(/\\s/g, '').toLowerCase();
+      var target = name.replace(/\s/g, '').toLowerCase();
       for (var i = 0; i < sheets.length; i++) {
-        var sName = sheets[i].getName().replace(/\\s/g, '').toLowerCase();
+        var sName = sheets[i].getName().replace(/\s/g, '').toLowerCase();
         if (sName === target || (target === 'log' && sName === '로그') || (target === '로그' && sName === 'log')) {
+          return sheets[i];
+        }
+        if (target.indexOf('사전') > -1 && sName.indexOf('사전') > -1) {
+          return sheets[i];
+        }
+        if (target.indexOf('본기량') > -1 && sName.indexOf('본기량') > -1) {
           return sheets[i];
         }
       }
       return null;
+    }
+
+    function formatSheetDate(val) {
+      if (!val && val !== 0) return '';
+      if (val instanceof Date) {
+        return Utilities.formatDate(val, "GMT+9", "yyyy-MM-dd");
+      }
+      if (typeof val === 'number' && val >= 25000 && val <= 65000) {
+        var d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return Utilities.formatDate(d, "GMT+9", "yyyy-MM-dd");
+      }
+      var s = String(val).trim().replace(/\s+/g, '');
+      if (!s || s === '-' || s === 'null' || s === 'undefined') return '';
+      if (s.indexOf('T') > -1) s = s.split('T')[0];
+      var m = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+      if (m) {
+        var mm = ('0' + m[2]).slice(-2);
+        var dd = ('0' + m[3]).slice(-2);
+        return m[1] + '-' + mm + '-' + dd;
+      }
+      var m2 = s.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})/);
+      if (m2) {
+        var yyyy = '20' + m2[1];
+        var mm2 = ('0' + m2[2]).slice(-2);
+        var dd2 = ('0' + m2[3]).slice(-2);
+        return yyyy + '-' + mm2 + '-' + dd2;
+      }
+      if (/^\d{8}$/.test(s)) {
+        return s.substring(0, 4) + '-' + s.substring(4, 6) + '-' + s.substring(6, 8);
+      }
+      return s;
+    }
+
+    function computeTrack(agency) {
+      if (!agency) return '민간업체';
+      var s = String(agency).toLowerCase().replace(/\s+/g, '');
+      if (s.indexOf('koica') > -1 || s.indexOf('코이카') > -1 || s.indexOf('세랑') > -1 || s.indexOf('serang') > -1) {
+        return '공공기관';
+      }
+      return '민간업체';
     }
 
     function parseSheet(sheetName) {
@@ -34,11 +80,43 @@ function doGet(e) {
       var headerIdx = -1;
       for (var i = 0; i < Math.min(data.length, 5); i++) {
         var rowStr = JSON.stringify(data[i]);
-        if (rowStr.indexOf('NO') > -1 || rowStr.indexOf('응시번호') > -1 || rowStr.indexOf('수험번호') > -1 || rowStr.indexOf('성 명') > -1) {
+        if (rowStr.indexOf('NO') > -1 || rowStr.indexOf('응시번호') > -1 || rowStr.indexOf('수험번호') > -1 || rowStr.indexOf('성 명') > -1 || rowStr.indexOf('성명') > -1) {
           headerIdx = i; break;
         }
       }
       var startIdx = headerIdx !== -1 ? headerIdx + 1 : 1;
+      var isMainSheet = sheetName.indexOf('본기량') > -1;
+
+      // 기본 열 인덱스 (0-indexed: Z열=25, AA열=26 등)
+      var colPass = 25;       // Z열 기본: 합격일자
+      var colFail = 26;       // AA열 기본: 탈락일자
+      var colEntry = 27;      // AB열 기본 (본기량): 입국일자
+      var colEntryFail = 28;  // AC열 기본 (본기량): 입국탈락일자
+      var colTrack = isMainSheet ? 29 : 27; // 본기량: AD열(29) / 사전기량: AB열(27)
+      var colDept = 30;       // AE열 기본 (본기량): 부서명
+      var colVideo = 31;      // AF열 기본: 영상
+      var colTest = 32;       // AG열 기본: 인성검사
+      var colStar = 33;       // AH열 기본: 별표
+      var colMemo = 34;       // AI열 기본: 면접특이사항
+      var colSkillMemo = 35;  // AJ열 기본: 기량특이사항
+
+      // 헤더 행이 존재하면 헤더 텍스트로 열 인덱스를 동적으로 자동 감지
+      if (headerIdx !== -1 && data[headerIdx]) {
+        var hRow = data[headerIdx];
+        for (var c = 0; c < hRow.length; c++) {
+          var hStr = String(hRow[c] || '').replace(/\s+/g, '');
+          if (!hStr) continue;
+          if (hStr.indexOf('합격일자') > -1 || hStr.indexOf('합격일') > -1) colPass = c;
+          else if (hStr.indexOf('입국탈락') > -1) colEntryFail = c;
+          else if (hStr.indexOf('탈락일자') > -1 || (hStr.indexOf('탈락일') > -1 && hStr.indexOf('입국') === -1)) colFail = c;
+          else if (hStr.indexOf('입국일자') > -1 || (hStr.indexOf('입국일') > -1 && hStr.indexOf('탈락') === -1)) colEntry = c;
+          else if (hStr.indexOf('트랙') > -1 || hStr.toLowerCase().indexOf('track') > -1) colTrack = c;
+          else if (hStr.indexOf('부서') > -1 || hStr.indexOf('배치부서') > -1) colDept = c;
+          else if (hStr.indexOf('영상') > -1 || hStr.indexOf('동영상') > -1 || hStr.toLowerCase().indexOf('video') > -1) colVideo = c;
+          else if (hStr.indexOf('인성') > -1 || hStr.toLowerCase().indexOf('test') > -1) colTest = c;
+          else if (hStr.indexOf('별표') > -1 || hStr.indexOf('★') > -1) colStar = c;
+        }
+      }
       
       for (var i = startIdx; i < data.length; i++) {
         var r = data[i];
@@ -47,19 +125,33 @@ function doGet(e) {
         var dob = r[4] instanceof Date ? Utilities.formatDate(r[4], "GMT+9", "yyyy-MM-dd") : r[4];
         var evalDate = r[24] instanceof Date ? Utilities.formatDate(r[24], "GMT+9", "yyyy-MM-dd HH:mm:ss") : r[24];
         
-        // AF열(32번째 열, 인덱스 31): 영상 링크
-        // AG열(33번째 열, 인덱스 32): 인성검사지 링크
-        // AH열(34번째 열, 인덱스 33): 별표 (특이사항/관심 표기: ★ or true or 1)
-        // AI열(35번째 열, 인덱스 34): 한국어 면접 특이사항
-        // AJ열(36번째 열, 인덱스 35): 기량 검증 특이사항
-        var videoUrl = String(r[31] || '').trim();
-        var testUrl = String(r[32] || '').trim();
-        var starVal = String(r[33] || '').trim();
+        // Z열(26번째 열, idx 25) / AA열(27번째 열, idx 26) 등
+        var passDate = formatSheetDate(r[colPass]);
+        var failDate = formatSheetDate(r[colFail]);
+        var entryDate = '';
+        var entryFailDate = '';
+        var trackVal = '';
+        var deptVal = '';
+
+        if (isMainSheet) {
+          entryDate = formatSheetDate(r[colEntry]);
+          entryFailDate = formatSheetDate(r[colEntryFail]);
+          trackVal = String(r[colTrack] || '').trim();
+          if (!trackVal) trackVal = computeTrack(String(r[23] || ''));
+          deptVal = String(r[colDept] || '').trim();
+        } else {
+          trackVal = String(r[colTrack] || '').trim();
+          if (!trackVal) trackVal = computeTrack(String(r[23] || ''));
+        }
+
+        var videoUrl = String(r[colVideo] || '').trim();
+        var testUrl = String(r[colTest] || '').trim();
+        var starVal = String(r[colStar] || '').trim();
         var isStarred = starVal === '★' || starVal.toUpperCase() === 'O' || starVal.toUpperCase() === 'TRUE' || starVal === '1';
         
         // 메모: AI열(한국어 인터뷰 특이사항) 또는 Q열(기존 의견) 또는 AJ열(기량 특이사항)
-        var interviewMemo = String(r[34] || r[16] || '').trim(); // AI열 또는 Q열
-        var skillMemo = String(r[35] || '').trim(); // AJ열
+        var interviewMemo = String(r[colMemo] || r[16] || '').trim();
+        var skillMemo = String(r[colSkillMemo] || '').trim();
         var combinedMemo = interviewMemo || skillMemo || '';
         
         var cand = {
@@ -82,6 +174,12 @@ function doGet(e) {
           agency: String(r[23] || '').trim(),
           eval_date: String(evalDate || '').trim(),
           eval_type: sheetName,
+          pass_date: passDate,
+          fail_date: failDate,
+          entry_date: entryDate,
+          entry_fail_date: entryFailDate,
+          track: trackVal,
+          department: deptVal,
           video_url: videoUrl,
           test_url: testUrl,
           memo: combinedMemo,
@@ -492,6 +590,129 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
         message: "대상 응시자를 시트에서 찾을 수 없습니다: " + appNo
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // 기능 3-3: 일정 및 부서 일괄/개별 등록 및 수정/삭제 (batch_update_management)
+    // =========================================================================
+    if (payload.type === 'batch_update_management' || payload.type === 'update_management') {
+      function computeTrackGas(agency) {
+        if (!agency) return '민간업체';
+        var s = String(agency).toLowerCase().replace(/\s+/g, '');
+        if (s.indexOf('koica') > -1 || s.indexOf('코이카') > -1 || s.indexOf('세랑') > -1 || s.indexOf('serang') > -1) {
+          return '공공기관';
+        }
+        return '민간업체';
+      }
+
+      var updates = payload.updates || [payload];
+      var count = 0;
+
+      for (var u = 0; u < updates.length; u++) {
+        var up = updates[u];
+        var tApp = String(up.app_no || '').trim();
+        var tKey = extractAppNoKey(tApp);
+        var tName = String(up.name || '').replace(/\s/g, '');
+        var tType = up.eval_type || evalType;
+
+        var targetSheets = [];
+        if (tType) {
+          var sDirect = getSheetRobust(tType);
+          if (sDirect) targetSheets.push(sDirect);
+        }
+        var sMainM = getSheetRobust("본기량검증");
+        var sPreM = getSheetRobust("사전기량검증");
+        if (sMainM && targetSheets.indexOf(sMainM) === -1) targetSheets.push(sMainM);
+        if (sPreM && targetSheets.indexOf(sPreM) === -1) targetSheets.push(sPreM);
+
+        for (var sIdx = 0; sIdx < targetSheets.length; sIdx++) {
+          var targetSh = targetSheets[sIdx];
+          var isMain = targetSh.getName().indexOf('본기량') > -1;
+          var rowsD = targetSh.getDataRange().getValues();
+          var matched = false;
+
+          var colWritePass = 26;
+          var colWriteFail = 27;
+          var colWriteEntry = 28;
+          var colWriteEntryFail = 29;
+          var colWriteTrack = isMain ? 30 : 28;
+          var colWriteDept = 31;
+
+          if (rowsD.length > 0) {
+            for (var hIdx = 0; hIdx < Math.min(rowsD.length, 5); hIdx++) {
+              var hRow = rowsD[hIdx];
+              var hFound = false;
+              for (var c = 0; c < hRow.length; c++) {
+                var hStr = String(hRow[c] || '').replace(/\s+/g, '');
+                if (hStr.indexOf('합격일자') > -1 || hStr.indexOf('합격일') > -1) { colWritePass = c + 1; hFound = true; }
+                else if (hStr.indexOf('입국탈락') > -1) { colWriteEntryFail = c + 1; hFound = true; }
+                else if (hStr.indexOf('탈락일자') > -1 || (hStr.indexOf('탈락일') > -1 && hStr.indexOf('입국') === -1)) { colWriteFail = c + 1; hFound = true; }
+                else if (hStr.indexOf('입국일자') > -1 || (hStr.indexOf('입국일') > -1 && hStr.indexOf('탈락') === -1)) { colWriteEntry = c + 1; hFound = true; }
+                else if (hStr.indexOf('트랙') > -1 || hStr.toLowerCase().indexOf('track') > -1) { colWriteTrack = c + 1; hFound = true; }
+                else if (hStr.indexOf('부서') > -1 || hStr.indexOf('배치부서') > -1) { colWriteDept = c + 1; hFound = true; }
+              }
+              if (hFound) break;
+            }
+          }
+
+          for (var rIdx = 1; rIdx < rowsD.length; rIdx++) {
+            var rowApp = String(rowsD[rIdx][1] || '').trim();
+            var rowNm = String(rowsD[rIdx][3] || '').replace(/\s/g, '');
+            if (rowApp === tApp || (tKey && extractAppNoKey(rowApp) === tKey) || (tName && rowNm === tName)) {
+              var rNum = rIdx + 1;
+              var agencyVal = String(rowsD[rIdx][23] || '');
+              var trackToSet = computeTrackGas(agencyVal);
+
+              // 1. 합격일자
+              if (up.pass_date !== undefined) {
+                targetSh.getRange(rNum, colWritePass).setValue(up.pass_date || '');
+                if (up.pass_date) targetSh.getRange(rNum, colWriteFail).setValue(''); // 합격 시 탈락일자 초기화
+              }
+
+              // 2. 탈락일자
+              if (up.fail_date !== undefined) {
+                targetSh.getRange(rNum, colWriteFail).setValue(up.fail_date || '');
+                if (up.fail_date) targetSh.getRange(rNum, colWritePass).setValue(''); // 탈락 시 합격일자 초기화
+              }
+
+              if (isMain) {
+                // 본기량검증:
+                // 입국일자
+                if (up.entry_date !== undefined) {
+                  targetSh.getRange(rNum, colWriteEntry).setValue(up.entry_date || '');
+                  if (up.entry_date) targetSh.getRange(rNum, colWriteEntryFail).setValue(''); // 입국 시 입국탈락일자 초기화
+                }
+                // 입국 탈락일자
+                if (up.entry_fail_date !== undefined) {
+                  targetSh.getRange(rNum, colWriteEntryFail).setValue(up.entry_fail_date || '');
+                  if (up.entry_fail_date) targetSh.getRange(rNum, colWriteEntry).setValue(''); // 입국탈락 시 입국일자 초기화
+                }
+                // 트랙 (자동 판별 또는 지정)
+                targetSh.getRange(rNum, colWriteTrack).setValue(up.track || trackToSet);
+                // 부서명
+                if (up.department !== undefined) {
+                  targetSh.getRange(rNum, colWriteDept).setValue(up.department || '');
+                }
+              } else {
+                // 사전기량검증:
+                // 트랙 (자동 판별 또는 지정)
+                targetSh.getRange(rNum, colWriteTrack).setValue(up.track || trackToSet);
+              }
+
+              count++;
+              matched = true;
+              break;
+            }
+          }
+          if (matched) break;
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        updated_count: count,
+        message: "일정 및 부서 정보가 성공적으로 반영되었습니다."
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

@@ -36,7 +36,32 @@ export interface Candidate {
   // Media Links (Google Drive)
   video_url?: string; // 영상 공유 링크 (AF열)
   test_url?: string;  // 인성검사 보고서 링크 (AG열)
+
+  // 일정 및 배정 관리 (Z ~ AE열)
+  pass_date?: string;       // 합격일자 (사전기량: Z열 / 본기량: Z열)
+  fail_date?: string;       // 탈락일자 (사전기량: AA열 / 본기량: AA열)
+  entry_date?: string;      // 입국일자 (본기량 전용: AB열)
+  entry_fail_date?: string; // 입국 탈락일자 (본기량 전용: AC열)
+  track?: string;           // 트랙 (사전기량: AB열 / 본기량: AD열) - '공공기관' | '민간업체'
+  department?: string;      // 부서명 (본기량 전용: AE열)
 }
+
+export const DEPARTMENTS = [
+  '가공',
+  '대조',
+  '판넬',
+  '의장1',
+  '의장2',
+  '의장3',
+  '건조1',
+  '건조2',
+  '건조3',
+  '선실생산',
+  '선박커미셔닝',
+  '선행의장'
+] as const;
+
+export type DepartmentType = typeof DEPARTMENTS[number];
 
 export interface Log {
   app_no: string;

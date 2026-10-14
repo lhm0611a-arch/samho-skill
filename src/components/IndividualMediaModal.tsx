@@ -220,7 +220,7 @@ export const IndividualMediaModal: React.FC<IndividualMediaModalProps> = ({
                   <Video className="w-3.5 h-3.5" />
                 </div>
                 <label className="text-xs font-black text-slate-100 flex items-center gap-1.5">
-                  1. 면접 / 실기 영상 링크 등록 (스프레드시트 AF열)
+                  1. 면접 / 실기 영상 링크 등록
                 </label>
               </div>
 
@@ -337,7 +337,7 @@ export const IndividualMediaModal: React.FC<IndividualMediaModalProps> = ({
                   <FileText className="w-3.5 h-3.5" />
                 </div>
                 <label className="text-xs font-black text-slate-100 flex items-center gap-1.5">
-                  2. 인성검사 결과지 링크 등록 (스프레드시트 AG열)
+                  2. 인성검사 결과지 링크 등록
                 </label>
               </div>
 

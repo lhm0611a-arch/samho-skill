@@ -7,7 +7,6 @@ export default function Header() {
   const { currentView, setCurrentView, userRole, setUserRole, evaluatorName, confCountry, confAgency, fetchData, logout } = useAppContext();
 
   const handleRefresh = async () => {
-    alert("데이터를 새로고침 합니다.");
     await fetchData();
   };
 

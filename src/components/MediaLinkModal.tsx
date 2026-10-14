@@ -245,7 +245,7 @@ export const MediaLinkModal: React.FC<MediaLinkModalProps> = ({
             type: 'success',
             title: '🎬 구글 드라이브 미디어 자동 연결 완료!',
             message: `• 대상 일자: ${selectedDate === 'all' || !selectedDate ? '전체 일자' : selectedDate}\n• 영상 연결 성공: ${vCount}건\n• 인성검사 연결 성공: ${tCount}건\n• 기존 링크 유지(보호): ${sCount}건`,
-            detail: '스프레드시트의 AF열(영상)과 AG열(인성검사)에 실시간으로 안전하게 저장되었습니다.'
+            detail: '스프레드시트에 실시간으로 안전하게 저장되었습니다.'
           });
         }
       } else {
@@ -399,7 +399,7 @@ export const MediaLinkModal: React.FC<MediaLinkModalProps> = ({
     if (!matchResult) return;
 
     setIsProcessing(true);
-    setProgressMsg('스프레드시트 AF열(영상) 및 AG열(인성검사) 반영 저장 중...');
+    setProgressMsg('스프레드시트에 미디어 링크 반영 저장 중...');
 
     try {
       const updates = matchResult.items
@@ -471,7 +471,7 @@ export const MediaLinkModal: React.FC<MediaLinkModalProps> = ({
                 구글 드라이브 영상 및 인성검사 결과 자동 연결
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate sm:whitespace-normal">
-                구글 드라이브 폴더의 응시번호(예: K-107, KE-031 등)를 시트(AF열/AG열)에 실시간 자동 연결합니다.
+                구글 드라이브 폴더의 응시번호(예: K-107, KE-031 등)와 미디어를 실시간 자동 연결합니다.
               </p>
             </div>
           </div>
@@ -798,8 +798,8 @@ export const MediaLinkModal: React.FC<MediaLinkModalProps> = ({
                     <tr>
                       <th className="p-2 text-center w-16">응시번호</th>
                       <th className="p-2 w-28">성명</th>
-                      <th className="p-2">영상 (AF열) 매칭 상태</th>
-                      <th className="p-2">인성검사 (AG열) 매칭 상태</th>
+                      <th className="p-2">영상 매칭 상태</th>
+                      <th className="p-2">인성검사 매칭 상태</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">

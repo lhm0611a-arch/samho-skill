@@ -13,7 +13,8 @@ import {
   normalizeJob,
   normalizeDob,
   calculateAge,
-  normalizeE9
+  normalizeE9,
+  computeAgencyTrack
 } from '../lib/utils';
 
 interface AppContextType {
@@ -41,6 +42,36 @@ interface AppContextType {
   updateCandidateMedia: (uid: string, videoUrl?: string, testUrl?: string) => Promise<boolean>;
   batchUpdateCandidateMedia: (updates: Array<{ uid?: string; app_no: string; eval_type?: string; eval_date?: string; video_url?: string; test_url?: string }>) => Promise<{ success: boolean; updatedCount: number; message?: string }>;
   toggleCandidateStar: (uid: string) => Promise<boolean>;
+  batchUpdateManagement: (
+    uids: string[],
+    changes: {
+      pass_date?: string;
+      fail_date?: string;
+      entry_date?: string;
+      entry_fail_date?: string;
+      department?: string;
+    }
+  ) => Promise<{ success: boolean; updatedCount: number; message?: string }>;
+  updateCandidateManagement: (
+    uid: string,
+    changes: {
+      pass_date?: string;
+      fail_date?: string;
+      entry_date?: string;
+      entry_fail_date?: string;
+      department?: string;
+    }
+  ) => Promise<boolean>;
+  isGasOutdated: boolean;
+  setIsGasOutdated: (v: boolean) => void;
+  syncStats: {
+    total: number;
+    passDateCount: number;
+    failDateCount: number;
+    entryDateCount: number;
+    deptCount: number;
+    lastSyncedAt: string;
+  };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -50,6 +81,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [globalLogs, setGlobalLogs] = useState<Log[]>([]);
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [evaluatorName, setEvaluatorName] = useState('');
+  const [syncStats, setSyncStats] = useState<{
+    total: number;
+    passDateCount: number;
+    failDateCount: number;
+    entryDateCount: number;
+    deptCount: number;
+    lastSyncedAt: string;
+  }>({
+    total: 0,
+    passDateCount: 0,
+    failDateCount: 0,
+    entryDateCount: 0,
+    deptCount: 0,
+    lastSyncedAt: ''
+  });
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxrCq-QC62HtmBYF4C5gibdCHb53D8dUvhwY4vXbFCPk_8TruwZ34eF00GmV1pRUjDD/exec';
   const [gasUrl, setGasUrlState] = useState<string>(DEFAULT_GAS_URL);
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -57,6 +103,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [confCountry, setConfCountryState] = useState('');
   const [confAgency, setConfAgencyState] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGasOutdated, setIsGasOutdated] = useState<boolean>(false);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem('gasUrl') || localStorage.getItem('hd_gas_url');
@@ -99,9 +146,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const count = seen.get(base) || 0;
           seen.set(base, count + 1);
           const uid = count === 0 ? base : `${base}_${count}`;
-          return { ...c, eval_date: eDate, uid };
+          return { 
+            ...c, 
+            eval_date: eDate, 
+            uid,
+            track: c.track || computeAgencyTrack(c.agency),
+            pass_date: c.pass_date ? normalizeDate(c.pass_date) : '',
+            fail_date: c.fail_date ? normalizeDate(c.fail_date) : '',
+            entry_date: c.entry_date ? normalizeDate(c.entry_date) : '',
+            entry_fail_date: c.entry_fail_date ? normalizeDate(c.entry_fail_date) : '',
+            department: c.department || ''
+          };
         });
         setCandidates(sanitized);
+        const pCount = sanitized.filter((c: any) => Boolean(c.pass_date)).length;
+        const fCount = sanitized.filter((c: any) => Boolean(c.fail_date)).length;
+        const eCount = sanitized.filter((c: any) => Boolean(c.entry_date)).length;
+        const dCount = sanitized.filter((c: any) => Boolean(c.department)).length;
+        setSyncStats({
+          total: sanitized.length,
+          passDateCount: pCount,
+          failDateCount: fCount,
+          entryDateCount: eCount,
+          deptCount: dCount,
+          lastSyncedAt: '로컬 캐시'
+        });
       }
     } catch (e) {
       console.error("Failed to load local data", e);
@@ -152,15 +221,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       // Group candidate rows by unique applicant key to prevent duplicate listings
       const rawCandidates = data.candidates || [];
+
+      // 구글 앱스 스크립트가 Z~AE열(합격/탈락/입국일자)을 가져오는 최신 버전인지 판별
+      const isOutdated = rawCandidates.length > 0 && !('pass_date' in rawCandidates[0]);
+      setIsGasOutdated(isOutdated);
+
       const deduplicatedMap = new Map<string, any>();
 
       rawCandidates.forEach((d: any, index: number) => {
         const eType = normalizeType(d.eval_type);
         const appNo = normalizeAppNo(d.app_no || index);
+        const name = normalizeName(d.name || d.raw_name);
         const country = String(d.country || '').trim();
         const agency = String(d.agency || '').trim();
-        // Candidate key: combination of app_no, eval_type, country, agency
-        const candKey = `${appNo}_${eType}_${country}_${agency}`;
+        // Candidate key: combination of app_no, name, eval_type, country, agency
+        // (Includes candidate name so different batches using same app_no like TM006 vs TM-006 are not wrongly merged)
+        const candKey = `${appNo}_${name}_${eType}_${country}_${agency}`;
 
         if (!deduplicatedMap.has(candKey)) {
           deduplicatedMap.set(candKey, { ...d, app_no: appNo, _index: index });
@@ -170,11 +246,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const preferNew = (!existing.eval_date && d.eval_date) ||
                             ((Number(d.k_score) || 0) > (Number(existing.k_score) || 0)) ||
                             ((Number(d.s_score_weld) || 0) > (Number(existing.s_score_weld) || 0));
-          if (preferNew) {
-            deduplicatedMap.set(candKey, { ...existing, ...d, app_no: appNo, _index: existing._index });
-          } else {
-            deduplicatedMap.set(candKey, { ...d, ...existing, app_no: appNo });
-          }
+          const baseItem = preferNew ? { ...existing, ...d, app_no: appNo, _index: existing._index } : { ...d, ...existing, app_no: appNo };
+
+          // 일정/부서/미디어 등 수기 입력 필드는 빈 값이 아닌 쪽을 우선 보존
+          const merged = {
+            ...baseItem,
+            pass_date: d.pass_date || existing.pass_date || '',
+            fail_date: d.fail_date || existing.fail_date || '',
+            entry_date: d.entry_date || existing.entry_date || '',
+            entry_fail_date: d.entry_fail_date || existing.entry_fail_date || '',
+            track: d.track || existing.track || '',
+            department: d.department || existing.department || '',
+            starred: d.starred !== undefined ? d.starred : existing.starred,
+            video_url: d.video_url || existing.video_url || '',
+            test_url: d.test_url || existing.test_url || '',
+            memo: d.memo || existing.memo || '',
+            interview_memo: d.interview_memo || existing.interview_memo || '',
+            skill_memo: d.skill_memo || existing.skill_memo || ''
+          };
+          deduplicatedMap.set(candKey, merged);
         }
       });
 
@@ -272,6 +362,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const skillMemo = String(d.skill_memo || d['기량특이사항'] || d['AJ'] || '').trim();
         const combinedMemo = interviewMemo || skillMemo || '';
 
+        const passDate = d.pass_date ? normalizeDate(d.pass_date) : (d['합격일자'] ? normalizeDate(d['합격일자']) : (d['합격일'] ? normalizeDate(d['합격일']) : (d['합격'] ? normalizeDate(d['합격']) : '')));
+        const failDate = d.fail_date ? normalizeDate(d.fail_date) : (d['탈락일자'] ? normalizeDate(d['탈락일자']) : (d['탈락일'] ? normalizeDate(d['탈락일']) : (d['탈락'] ? normalizeDate(d['탈락']) : '')));
+        const entryDate = d.entry_date ? normalizeDate(d.entry_date) : (d['입국일자'] ? normalizeDate(d['입국일자']) : (d['입국일'] ? normalizeDate(d['입국일']) : (d['입국'] ? normalizeDate(d['입국']) : '')));
+        const entryFailDate = d.entry_fail_date ? normalizeDate(d.entry_fail_date) : (d['입국탈락일자'] ? normalizeDate(d['입국탈락일자']) : (d['입국탈락'] ? normalizeDate(d['입국탈락']) : ''));
+        const trackVal = d.track || d['트랙'] || computeAgencyTrack(d.agency);
+        const deptVal = String(d.department || d['부서'] || d['부서명'] || d['배치부서'] || '').trim();
+
         return {
             ...d,
             app_no: appNo,
@@ -295,6 +392,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             k_status: k_stat,
             s_status: s_stat,
             result: res,
+            pass_date: passDate,
+            fail_date: failDate,
+            entry_date: entryDate,
+            entry_fail_date: entryFailDate,
+            track: trackVal,
+            department: deptVal,
             video_url: videoUrl,
             test_url: testUrl,
             memo: combinedMemo,
@@ -316,10 +419,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem('hd_logs', JSON.stringify(logs));
       setCandidates(mappedCandidates);
       localStorage.setItem('hd_candidates', JSON.stringify(mappedCandidates));
-      alert("클라우드 데이터 연동이 완료되었습니다.");
+
+      const pCount = mappedCandidates.filter(c => Boolean(c.pass_date)).length;
+      const fCount = mappedCandidates.filter(c => Boolean(c.fail_date)).length;
+      const eCount = mappedCandidates.filter(c => Boolean(c.entry_date)).length;
+      const dCount = mappedCandidates.filter(c => Boolean(c.department)).length;
+      setSyncStats({
+        total: mappedCandidates.length,
+        passDateCount: pCount,
+        failDateCount: fCount,
+        entryDateCount: eCount,
+        deptCount: dCount,
+        lastSyncedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      });
     } catch (e) {
-      console.error(e);
-      alert("서버 데이터 로드 실패. 앱스 스크립트 연결을 확인하세요.");
+      console.error("데이터 로드 실패:", e);
     } finally {
       setIsLoading(false);
     }
@@ -481,8 +595,127 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const batchUpdateManagement = async (
+    uids: string[],
+    changes: {
+      pass_date?: string;
+      fail_date?: string;
+      entry_date?: string;
+      entry_fail_date?: string;
+      department?: string;
+    }
+  ): Promise<{ success: boolean; updatedCount: number; message?: string }> => {
+    if (!uids || uids.length === 0) {
+      return { success: true, updatedCount: 0 };
+    }
+
+    try {
+      const uidSet = new Set(uids);
+      let updatedCount = 0;
+      const targetUpdatesForGas: any[] = [];
+
+      const nextCandidates = candidates.map(c => {
+        if (uidSet.has(c.uid)) {
+          updatedCount++;
+          const newCand = { ...c };
+
+          // 1. 합격일자
+          if (changes.pass_date !== undefined) {
+            newCand.pass_date = changes.pass_date;
+            if (changes.pass_date) newCand.fail_date = ''; // 합격 등록 시 탈락일자 초기화
+          }
+
+          // 2. 탈락일자
+          if (changes.fail_date !== undefined) {
+            newCand.fail_date = changes.fail_date;
+            if (changes.fail_date) newCand.pass_date = ''; // 탈락 등록 시 합격일자 초기화
+          }
+
+          // 3. 입국일자 (본기량)
+          if (changes.entry_date !== undefined) {
+            newCand.entry_date = changes.entry_date;
+            if (changes.entry_date) newCand.entry_fail_date = '';
+          }
+
+          // 4. 입국 탈락일자 (본기량)
+          if (changes.entry_fail_date !== undefined) {
+            newCand.entry_fail_date = changes.entry_fail_date;
+            if (changes.entry_fail_date) newCand.entry_date = '';
+          }
+
+          // 5. 부서명
+          if (changes.department !== undefined) {
+            newCand.department = changes.department;
+          }
+
+          // 트랙 자동 보장
+          newCand.track = newCand.track || computeAgencyTrack(newCand.agency);
+
+          targetUpdatesForGas.push({
+            app_no: newCand.app_no,
+            name: newCand.name,
+            eval_type: newCand.eval_type,
+            pass_date: newCand.pass_date || '',
+            fail_date: newCand.fail_date || '',
+            entry_date: newCand.entry_date || '',
+            entry_fail_date: newCand.entry_fail_date || '',
+            track: newCand.track,
+            department: newCand.department || ''
+          });
+
+          return newCand;
+        }
+        return c;
+      });
+
+      setCandidates(nextCandidates);
+      localStorage.setItem('hd_candidates', JSON.stringify(nextCandidates));
+
+      // Sync to Google Apps Script
+      if (gasUrl && targetUpdatesForGas.length > 0) {
+        try {
+          fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              type: 'batch_update_management',
+              updates: targetUpdatesForGas
+            })
+          }).catch(e => console.warn('GAS batch_update_management warning:', e));
+        } catch (gasErr) {
+          console.warn('Google Sheet GAS batch management sync warning:', gasErr);
+        }
+      }
+
+      return { success: true, updatedCount };
+    } catch (err: any) {
+      console.error('Batch management update error:', err);
+      return { success: false, updatedCount: 0, message: err.message };
+    }
+  };
+
+  const updateCandidateManagement = async (
+    uid: string,
+    changes: {
+      pass_date?: string;
+      fail_date?: string;
+      entry_date?: string;
+      entry_fail_date?: string;
+      department?: string;
+    }
+  ): Promise<boolean> => {
+    const res = await batchUpdateManagement([uid], changes);
+    return res.success;
+  };
+
   useEffect(() => {
-    if (userRole && gasUrl) {
+    if (gasUrl) {
+      fetchData();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (userRole && gasUrl && candidates.length === 0) {
       fetchData();
     }
   }, [userRole]);
@@ -499,7 +732,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       evaluatorName, setEvaluatorName, gasUrl, setGasUrl, currentView, setCurrentView,
       selectedCandidateUid, setSelectedCandidateUid,
       confCountry, setConfCountry, confAgency, setConfAgency, fetchData, isLoading, logout,
-      updateCandidateMedia, batchUpdateCandidateMedia, toggleCandidateStar
+      updateCandidateMedia, batchUpdateCandidateMedia, toggleCandidateStar,
+      batchUpdateManagement, updateCandidateManagement,
+      isGasOutdated, setIsGasOutdated, syncStats
     }}>
       {children}
     </AppContext.Provider>

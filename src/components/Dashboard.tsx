@@ -587,29 +587,20 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Action Buttons: Executive Report, Media Link & Excel Download */}
+            {/* Action Buttons: Media Link & Excel Download (Report button is already in global Header) */}
             <div className="flex items-center gap-2 ml-auto shrink-0">
               <button 
                 onClick={() => setShowMediaLinkModal(true)} 
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-semibold transition-all shadow-sm flex items-center gap-1.5 border border-slate-700 shrink-0 justify-center whitespace-nowrap"
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-semibold transition-all shadow-sm flex items-center gap-1.5 border border-slate-700 shrink-0 justify-center whitespace-nowrap cursor-pointer"
                 title="특정 평가일자 영상 및 인성검사 결과 구글 드라이브 일괄 연결"
               >
                 <FolderSync className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>영상/인성 드라이브 연결</span>
               </button>
-
-              <button 
-                onClick={() => setCurrentView('report')} 
-                className="bg-[#002c5f] hover:bg-[#00387a] text-white px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-semibold transition-all shadow-sm flex items-center gap-1.5 border border-blue-400/30 shrink-0 justify-center whitespace-nowrap"
-                title="HD현대삼호 공식 총괄 보고서 (PDF/인쇄) 생성 및 출력"
-              >
-                <FileText className="w-4 h-4 text-blue-200 shrink-0" />
-                <span>총괄 보고서 발행</span>
-              </button>
               
               <button 
                 onClick={exportToCSV} 
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-semibold transition-all shadow-sm flex items-center gap-1.5 border border-slate-700 shrink-0 justify-center whitespace-nowrap"
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 sm:px-3.5 md:px-4 h-[34px] sm:h-[36px] md:h-[38px] rounded-lg text-xs md:text-sm font-semibold transition-all shadow-sm flex items-center gap-1.5 border border-slate-700 shrink-0 justify-center whitespace-nowrap cursor-pointer"
                 title="필터링된 평가 결과 CSV 파일 다운로드"
               >
                 <FileSpreadsheet className="w-4 h-4 text-slate-400 shrink-0" />

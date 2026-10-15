@@ -1,105 +1,98 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="100%" height="100%">
   <defs>
-    <!-- Background Gradient: Deep Twilight High-Altitude Sky -->
-    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#0c1e3d" />
-      <stop offset="35%" stop-color="#1e295b" />
-      <stop offset="70%" stop-color="#3b2d6b" />
-      <stop offset="90%" stop-color="#7c3aed" stop-opacity="0.6" />
-      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.4" />
+    <!-- Sky Gradient: Vivid Sunset Twilight over High-Altitude Ocean of Clouds -->
+    <linearGradient id="vividSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f2b5c" />
+      <stop offset="35%" stop-color="#1d4ed8" />
+      <stop offset="65%" stop-color="#6366f1" />
+      <stop offset="85%" stop-color="#f43f5e" />
+      <stop offset="100%" stop-color="#f59e0b" />
     </linearGradient>
 
-    <!-- Sunset Golden Horizon Atmospheric Glow -->
-    <radialGradient id="sunsetGlow" cx="65%" cy="65%" r="65%">
-      <stop offset="0%" stop-color="#fdba74" stop-opacity="0.35" />
-      <stop offset="30%" stop-color="#f43f5e" stop-opacity="0.2" />
-      <stop offset="60%" stop-color="#6366f1" stop-opacity="0.1" />
-      <stop offset="100%" stop-color="#0c1e3d" stop-opacity="0" />
+    <!-- Golden Horizon Glow -->
+    <radialGradient id="sunHorizonGlow" cx="68%" cy="65%" r="65%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.9" />
+      <stop offset="25%" stop-color="#fb923c" stop-opacity="0.65" />
+      <stop offset="55%" stop-color="#a855f7" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#0f2b5c" stop-opacity="0" />
     </radialGradient>
 
-    <!-- Airplane Window Bezel Frame Gradient -->
-    <linearGradient id="windowBezel" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e293b" />
-      <stop offset="50%" stop-color="#0f172a" />
-      <stop offset="100%" stop-color="#090d16" />
+    <!-- Fluffy Cloud Layer Gradient -->
+    <linearGradient id="cloudBright" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="50%" stop-color="#e2e8f0" />
+      <stop offset="100%" stop-color="#94a3b8" />
     </linearGradient>
 
-    <!-- Cloud Soft Shading Gradients -->
-    <linearGradient id="cloudGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
-      <stop offset="50%" stop-color="#cbd5e1" stop-opacity="0.25" />
-      <stop offset="100%" stop-color="#64748b" stop-opacity="0.05" />
+    <linearGradient id="cloudSunsetGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffedd5" />
+      <stop offset="45%" stop-color="#fda4af" />
+      <stop offset="100%" stop-color="#4338ca" />
     </linearGradient>
 
-    <linearGradient id="cloudSunset" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#fed7aa" stop-opacity="0.5" />
-      <stop offset="60%" stop-color="#f472b6" stop-opacity="0.3" />
-      <stop offset="100%" stop-color="#312e81" stop-opacity="0.1" />
-    </linearGradient>
-
-    <!-- Airplane Window Mask -->
+    <!-- Airplane Window Oval Mask -->
     <clipPath id="windowClip">
-      <rect x="520" y="45" width="230" height="340" rx="90" />
+      <rect x="500" y="30" width="265" height="385" rx="100" />
     </clipPath>
   </defs>
 
-  <!-- Deep Canvas Base -->
-  <rect width="800" height="450" fill="#06101e" />
+  <!-- Deep Background Base -->
+  <rect width="800" height="450" fill="#061224" />
 
-  <!-- The Sky and Clouds visible through & around the airplane frame -->
+  <!-- The Sky and Clouds visible through the Oval Airplane Window -->
   <g clip-path="url(#windowClip)">
     <!-- High Altitude Sky -->
-    <rect x="500" y="30" width="270" height="370" fill="url(#skyGrad)" />
-    <rect x="500" y="30" width="270" height="370" fill="url(#sunsetGlow)" />
+    <rect x="480" y="10" width="310" height="420" fill="url(#vividSky)" />
+    <rect x="480" y="10" width="310" height="420" fill="url(#sunHorizonGlow)" />
 
-    <!-- Distant Mountain/Cloud Horizon Line -->
-    <line x1="500" y1="240" x2="770" y2="240" stroke="#fcd34d" stroke-width="2" stroke-opacity="0.4" />
-
-    <!-- Majestic Cloud Formations (Cumulus Cloud Tops) -->
-    <!-- Far Cloud Layer (Illuminated by sunset) -->
-    <path d="M 500,240 Q 530,225 560,230 Q 590,210 630,220 Q 670,205 710,225 Q 740,215 770,235 L 770,380 L 500,380 Z" fill="url(#cloudSunset)" />
-
-    <!-- Near Cloud Pillows & Waves -->
-    <path d="M 500,270 Q 540,250 580,265 Q 620,240 670,260 Q 720,245 770,275 L 770,400 L 500,400 Z" fill="url(#cloudGrad1)" />
-    <path d="M 500,305 Q 550,285 600,300 Q 650,275 700,295 Q 740,285 770,310 L 770,410 L 500,410 Z" fill="#e2e8f0" fill-opacity="0.25" />
-
-    <!-- Airplane Wing Silhouette Cutting Across Cloud Tops -->
-    <!-- Swept-back Jet Wing -->
-    <polygon points="500,290 680,210 705,212 610,320 500,340" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+    <!-- Luminous Sunset Horizon Line -->
+    <line x1="480" y1="230" x2="800" y2="230" stroke="#fef08a" stroke-width="3" />
     
-    <!-- Wing Panel Seams & Flap Track Fairings -->
-    <line x1="540" y1="290" x2="630" y2="250" stroke="#475569" stroke-width="1.2" stroke-opacity="0.6" />
-    <line x1="580" y1="310" x2="670" y2="270" stroke="#475569" stroke-width="1.2" stroke-opacity="0.6" />
+    <!-- Sunset Glare Sun Disc on Horizon -->
+    <circle cx="680" cy="230" r="28" fill="#ffffff" filter="blur(4px)" />
+    <circle cx="680" cy="230" r="18" fill="#fef08a" />
 
-    <!-- Upward Winglet Tip -->
-    <path d="M 680,210 L 705,212 L 712,180 L 695,182 Z" fill="#1e293b" stroke="#60a5fa" stroke-width="1" stroke-opacity="0.8" />
-    <!-- Winglet Green/Red Navigation Beacon Light -->
-    <circle cx="710" cy="184" r="3" fill="#38bdf8" />
-    <circle cx="710" cy="184" r="8" fill="#38bdf8" fill-opacity="0.4" />
+    <!-- Layer 1: Distant Sunset-Illuminated Clouds -->
+    <path d="M 480,230 Q 520,210 560,218 Q 600,195 650,205 Q 700,188 740,210 Q 770,200 800,225 L 800,430 L 480,430 Z" fill="url(#cloudSunsetGlow)" />
+
+    <!-- Layer 2: Rolling Billowing White Clouds (뭉게구름) -->
+    <path d="M 480,265 Q 525,240 570,255 Q 615,230 665,248 Q 715,235 765,260 Q 785,250 800,270 L 800,430 L 480,430 Z" fill="url(#cloudBright)" />
+
+    <!-- Layer 3: Fluffy Cloud Tops Foreground -->
+    <path d="M 480,310 Q 530,285 580,300 Q 630,275 685,295 Q 735,280 780,310 L 800,315 L 800,430 L 480,430 Z" fill="#ffffff" />
+    <path d="M 500,345 Q 560,320 620,338 Q 680,315 740,335 L 800,345 L 800,430 L 480,430 Z" fill="#f8fafc" />
+
+    <!-- Jet Airliner Wing Slicing Through the Clouds (비행기 날개) -->
+    <polygon points="480,300 680,215 710,218 610,330 480,360" fill="#0f172a" stroke="#38bdf8" stroke-width="1.8" />
     
-    <!-- Wing Top Reflected Ambient Light -->
-    <polygon points="510,292 680,212 685,216 530,305" fill="#f8fafc" fill-opacity="0.18" />
+    <!-- Wing Top Shiny Aerodynamic Metal Reflection -->
+    <polygon points="490,302 678,217 684,222 510,325" fill="#e2e8f0" fill-opacity="0.35" />
 
-    <!-- Cabin Glass Double-Pane Glare / Reflection Arc -->
-    <path d="M 540,65 Q 635,50 730,120 Q 680,200 540,160 Z" fill="#ffffff" fill-opacity="0.04" />
+    <!-- Wing Panel Lines & Flap Seams -->
+    <line x1="530" y1="298" x2="625" y2="258" stroke="#64748b" stroke-width="1.5" />
+    <line x1="570" y1="318" x2="665" y2="278" stroke="#64748b" stroke-width="1.5" />
+
+    <!-- Vertical Winglet (날개 끝 윙렛) with Glowing Navigation Strobe Beacon -->
+    <path d="M 680,215 L 710,218 L 718,172 L 698,174 Z" fill="#1e293b" stroke="#60a5fa" stroke-width="1.5" />
+    
+    <!-- Glowing Navigation Strobe Light (윙팁 항법등 비콘) -->
+    <circle cx="715" cy="176" r="6" fill="#38bdf8" />
+    <circle cx="715" cy="176" r="14" fill="#38bdf8" fill-opacity="0.5" filter="blur(2px)" />
+    <circle cx="715" cy="176" r="2" fill="#ffffff" />
+
+    <!-- Window Glass Glare Diagonal Reflection (비행기 이중창 유리 반사광) -->
+    <path d="M 520,70 Q 640,40 735,130 Q 690,200 520,150 Z" fill="#ffffff" fill-opacity="0.12" />
+    <path d="M 540,110 Q 650,85 720,155 Q 675,210 540,175 Z" fill="#ffffff" fill-opacity="0.08" />
   </g>
 
-  <!-- Realistic Oval Aircraft Window Bezel & Thick Wall Frame -->
-  <!-- Outer Frame Shadow & Bezel -->
-  <rect x="508" y="33" width="254" height="364" rx="100" fill="none" stroke="#0f172a" stroke-width="16" stroke-opacity="0.9" />
-  <!-- Inner Highlight Rim -->
-  <rect x="518" y="43" width="234" height="344" rx="92" fill="none" stroke="#334155" stroke-width="4" stroke-opacity="0.5" />
-  <rect x="521" y="46" width="228" height="338" rx="89" fill="none" stroke="#64748b" stroke-width="1.5" stroke-opacity="0.4" />
+  <!-- Solid Aircraft Cabin Wall & Double Bezel Frame (여객기 창문 베젤) -->
+  <!-- Outer Window Heavy Bezel -->
+  <rect x="490" y="20" width="285" height="405" rx="110" fill="none" stroke="#091426" stroke-width="24" />
+  <!-- Bezel Silver Inner Highlight Line -->
+  <rect x="498" y="28" width="269" height="389" rx="102" fill="none" stroke="#334155" stroke-width="5" />
+  <rect x="502" y="32" width="261" height="381" rx="98" fill="none" stroke="#94a3b8" stroke-width="1.8" />
 
-  <!-- Window Shade Slider Channel Grooves (Left & Right) -->
-  <line x1="514" y1="90" x2="514" y2="340" stroke="#1e293b" stroke-width="2" stroke-opacity="0.6" />
-  <line x1="756" y1="90" x2="756" y2="340" stroke="#1e293b" stroke-width="2" stroke-opacity="0.6" />
-
-  <!-- Ambient Light Soft Radiance into the Card's Left Section -->
-  <radialGradient id="cabinAmbient" cx="640" cy="220" r="400" gradientUnits="userSpaceOnUse">
-    <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.08" />
-    <stop offset="45%" stop-color="#818cf8" stop-opacity="0.04" />
-    <stop offset="100%" stop-color="#06101e" stop-opacity="0" />
-  </radialGradient>
-  <rect width="800" height="450" fill="url(#cabinAmbient)" pointer-events="none" />
+  <!-- Window Shade Slider Grips (블라인드 가이드) -->
+  <rect x="488" y="100" width="4" height="240" rx="2" fill="#1e293b" />
+  <rect x="774" y="100" width="4" height="240" rx="2" fill="#1e293b" />
 </svg>

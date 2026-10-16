@@ -632,30 +632,43 @@ export default function Dashboard() {
           document.body
         )}
 
-        {/* Summary Cards - Distinct Realistic Background Imagery with Subtle Enterprise Overlays */}
+        {/* Summary Cards - Vivid High-Resolution Authentic Real Photography */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-          {/* 1. Korean Assessment: Traditional Hanok & Wooden Lattice Motif */}
-          <div className="dx-card px-4 py-3 h-auto relative overflow-hidden flex flex-col border border-slate-800/90 bg-[#081526] shadow-sm bg-[url('/bg-korean.svg')] bg-cover bg-no-repeat bg-right group transition-all">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#071322]/95 via-[#081526]/85 to-[#081526]/40 pointer-events-none" />
+          {/* 1. Korean Assessment: Authentic Korean Traditional Hanok Architecture Photography */}
+          <div 
+            className="dx-card px-4 py-3 h-auto relative overflow-hidden flex flex-col border border-amber-600/40 shadow-lg group transition-all bg-[#071322]"
+          >
+            {/* Real Photograph Layer: Traditional Korean Hanok Giwa Roofs & Eaves with 1-tone brighter vivid presentation */}
+            <div 
+              className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-700 ease-out group-hover:scale-105 pointer-events-none"
+              style={{
+                backgroundImage: "url('/photo-korean.jpg')",
+                backgroundPosition: "right 40%",
+                opacity: 0.82,
+                filter: "contrast(1.15) brightness(1.12) saturate(1.2)"
+              }}
+            />
+            {/* Left text-protection gradient: ensures metrics remain crystal-clear while showcasing vivid Hanok photography on right */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#071322] via-[#071322]/75 via-45% to-transparent pointer-events-none z-0" />
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="text-[10px] text-amber-400/90 font-semibold tracking-wider uppercase mb-0.5">Korean Assessment</p>
-                  <h2 className="text-base md:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-1.5">
+                  <p className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase mb-0.5">Korean Assessment</p>
+                  <h2 className="text-base md:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-1.5 drop-shadow-sm">
                     <span>한국어 평가 종합</span>
                   </h2>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-slate-900/80 border border-amber-500/25 text-amber-300 flex items-center justify-center shrink-0 shadow-sm backdrop-blur-sm">
+                <div className="w-9 h-9 rounded-lg bg-slate-900/80 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0 shadow-sm backdrop-blur-sm">
                   <Languages className="w-4 h-4" />
                 </div>
               </div>
               <div className="flex-1 flex flex-col justify-end">
                 <div className="flex justify-between items-end mb-2">
-                  <div onClick={() => handleSubFilter('k-comp')} className="cursor-pointer group p-1 -ml-1 rounded-lg hover:bg-slate-800/60 transition-colors">
-                    <p className="text-xs text-slate-400 font-medium mb-0.5">평가 완료</p>
-                    <p className="text-2xl md:text-3xl font-extrabold text-slate-100 leading-none">
+                  <div onClick={() => handleSubFilter('k-comp')} className="cursor-pointer group p-1 -ml-1 rounded-lg hover:bg-slate-900/60 transition-colors">
+                    <p className="text-xs text-slate-300 font-medium mb-0.5">평가 완료</p>
+                    <p className="text-2xl md:text-3xl font-extrabold text-white leading-none drop-shadow-sm">
                       <span>{formatCount(kComp)}</span>
-                      <span className="text-xs font-normal text-slate-400 ml-1">/ <span>{formatCount(total)}</span>명</span>
+                      <span className="text-xs font-normal text-slate-300 ml-1">/ <span>{formatCount(total)}</span>명</span>
                     </p>
                   </div>
                   <div className="w-13 h-13 shrink-0"><Doughnut data={getChartData(kPassPure, kPassCond - kPassPure, kComp - kPassCond, kComp === 0)} options={chartOptions as any} /></div>
@@ -681,28 +694,41 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 2. Skill Verification: Shipyard Industrial Welding & Sparks Motif */}
-          <div className="dx-card px-4 py-3 h-auto relative overflow-hidden flex flex-col border border-slate-800/90 bg-[#06171e] shadow-sm bg-[url('/bg-skill.svg')] bg-cover bg-no-repeat bg-right group transition-all">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#04141a]/95 via-[#06171e]/85 to-[#06171e]/40 pointer-events-none" />
+          {/* 2. Skill Verification: Authentic Industrial Shipyard Welding & Sparks Photography */}
+          <div 
+            className="dx-card px-4 py-3 h-auto relative overflow-hidden flex flex-col border border-cyan-600/40 shadow-lg group transition-all bg-[#051722]"
+          >
+            {/* Real Photograph Layer: Skilled Industrial Welder Working on Steel with Sparks */}
+            <div 
+              className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-700 ease-out group-hover:scale-105 pointer-events-none"
+              style={{
+                backgroundImage: "url('/photo-welding.jpg')",
+                backgroundPosition: "right 30%",
+                opacity: 0.82,
+                filter: "contrast(1.15) brightness(1.12) saturate(1.2)"
+              }}
+            />
+            {/* Left text-protection gradient: ensures metrics remain crystal-clear while showcasing glowing welding sparks */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#051722] via-[#051722]/75 via-45% to-transparent pointer-events-none z-0" />
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="text-[10px] text-cyan-400/90 font-semibold tracking-wider uppercase mb-0.5">Skill Verification</p>
-                  <h2 className="text-base md:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-1.5">
+                  <p className="text-[10px] text-cyan-400 font-semibold tracking-wider uppercase mb-0.5">Skill Verification</p>
+                  <h2 className="text-base md:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-1.5 drop-shadow-sm">
                     <span>기량 평가 종합</span>
                   </h2>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-slate-900/80 border border-cyan-500/25 text-cyan-300 flex items-center justify-center shrink-0 shadow-sm backdrop-blur-sm">
+                <div className="w-9 h-9 rounded-lg bg-slate-900/80 border border-cyan-500/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-sm backdrop-blur-sm">
                   <Hammer className="w-4 h-4" />
                 </div>
               </div>
               <div className="flex-1 flex flex-col justify-end">
                 <div className="flex justify-between items-end mb-2">
-                  <div onClick={() => handleSubFilter('s-comp')} className="cursor-pointer group p-1 -ml-1 rounded-lg hover:bg-slate-800/60 transition-colors">
-                    <p className="text-xs text-slate-400 font-medium mb-0.5">평가 완료</p>
-                    <p className="text-2xl md:text-3xl font-extrabold text-slate-100 leading-none">
+                  <div onClick={() => handleSubFilter('s-comp')} className="cursor-pointer group p-1 -ml-1 rounded-lg hover:bg-slate-900/60 transition-colors">
+                    <p className="text-xs text-slate-300 font-medium mb-0.5">평가 완료</p>
+                    <p className="text-2xl md:text-3xl font-extrabold text-white leading-none drop-shadow-sm">
                       <span>{formatCount(sComp)}</span>
-                      <span className="text-xs font-normal text-slate-400 ml-1">/ <span>{formatCount(total)}</span>명</span>
+                      <span className="text-xs font-normal text-slate-300 ml-1">/ <span>{formatCount(total)}</span>명</span>
                     </p>
                   </div>
                   <div className="w-13 h-13 shrink-0"><Doughnut data={getChartData(sPass, 0, sComp - sPass, sComp === 0)} options={chartOptions as any} /></div>
@@ -720,28 +746,41 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 3. Final Result: Airplane Window & Flight Clouds Voyage Motif */}
-          <div className="dx-card px-4 py-3 h-auto relative overflow-hidden flex flex-col border border-slate-800/90 md:col-span-2 lg:col-span-1 bg-[#091224] shadow-sm bg-[url('/bg-result.svg')] bg-cover bg-no-repeat bg-right group transition-all">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#060e1d]/95 via-[#091224]/85 to-[#091224]/40 pointer-events-none" />
+          {/* 3. Final Result: Authentic Airplane Cabin Window & Clouds Photography */}
+          <div 
+            className="dx-card px-4 py-3 h-auto relative overflow-hidden flex flex-col border border-indigo-600/40 md:col-span-2 lg:col-span-1 shadow-lg group transition-all bg-[#061224]"
+          >
+            {/* Real Photograph Layer: Looking Out Airplane Window at Wing and Clouds in Flight */}
+            <div 
+              className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-700 ease-out group-hover:scale-105 pointer-events-none"
+              style={{
+                backgroundImage: "url('/photo-airplane.jpg')",
+                backgroundPosition: "right 45%",
+                opacity: 0.82,
+                filter: "contrast(1.15) brightness(1.12) saturate(1.2)"
+              }}
+            />
+            {/* Left text-protection gradient: ensures metrics remain crystal-clear while showcasing glowing airplane wing and sunset clouds */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#061224] via-[#061224]/75 via-45% to-transparent pointer-events-none z-0" />
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="text-[10px] text-indigo-400/90 font-semibold tracking-wider uppercase mb-0.5">Final Result</p>
-                  <h2 className="text-base md:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-1.5">
+                  <p className="text-[10px] text-indigo-400 font-semibold tracking-wider uppercase mb-0.5">Final Result</p>
+                  <h2 className="text-base md:text-lg font-bold text-slate-100 tracking-tight flex items-center gap-1.5 drop-shadow-sm">
                     <span>통합 최종 결과</span>
                   </h2>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-slate-900/80 border border-indigo-500/25 text-indigo-300 flex items-center justify-center shrink-0 shadow-sm backdrop-blur-sm">
+                <div className="w-9 h-9 rounded-lg bg-slate-900/80 border border-indigo-500/40 text-indigo-300 flex items-center justify-center shrink-0 shadow-sm backdrop-blur-sm">
                   <ClipboardCheck className="w-4 h-4" />
                 </div>
               </div>
               <div className="flex-1 flex flex-col justify-end">
                 <div className="flex justify-between items-end mb-2">
-                  <div onClick={() => handleSubFilter('t-comp')} className="cursor-pointer group p-1 -ml-1 rounded-lg hover:bg-slate-800/60 transition-colors">
-                    <p className="text-xs text-slate-400 font-medium mb-0.5">최종 판정 완료</p>
-                    <p className="text-2xl md:text-3xl font-extrabold text-slate-100 leading-none">
+                  <div onClick={() => handleSubFilter('t-comp')} className="cursor-pointer group p-1 -ml-1 rounded-lg hover:bg-slate-900/60 transition-colors">
+                    <p className="text-xs text-slate-300 font-medium mb-0.5">최종 판정 완료</p>
+                    <p className="text-2xl md:text-3xl font-extrabold text-white leading-none drop-shadow-sm">
                       <span>{formatCount(tComp)}</span>
-                      <span className="text-xs font-normal text-slate-400 ml-1">/ <span>{formatCount(total)}</span>명</span>
+                      <span className="text-xs font-normal text-slate-300 ml-1">/ <span>{formatCount(total)}</span>명</span>
                     </p>
                   </div>
                   <div className="w-13 h-13 shrink-0"><Doughnut data={getChartData(tPassPure, tPassCond - tPassPure, tComp - tPassCond, tComp === 0)} options={chartOptions as any} /></div>
@@ -865,33 +904,13 @@ export default function Dashboard() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Active Selection Toolbar */}
+          {/* Streamlined, single batch action button with selection badge */}
+          <div className="flex items-center gap-1.5 shrink-0">
             {selectedUids.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-md text-[11px] animate-in fade-in shrink-0">
-                <span className="font-semibold text-slate-200 flex items-center gap-1">
-                  <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
-                  <strong>{selectedUids.length}명</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsBatchModalOpen(true)}
-                  className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-1 shadow-sm transition-all cursor-pointer text-[11px]"
-                >
-                  <CalendarCheck className="w-3 h-3" />
-                  <span>관리</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedUids([])}
-                  className="text-slate-400 hover:text-white px-1 py-0.5 text-[10px] underline cursor-pointer"
-                >
-                  해제
-                </button>
-              </div>
+              <span className="text-[11px] px-2 py-1 rounded-md font-bold bg-blue-950/90 text-blue-300 border border-blue-500/50 shrink-0">
+                {selectedUids.length}명 선택
+              </span>
             )}
-
-            {/* Quick Bulk Modal Button */}
             <button
               type="button"
               onClick={() => {
@@ -900,12 +919,26 @@ export default function Dashboard() {
                 }
                 setIsBatchModalOpen(true);
               }}
-              className="text-xs px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-all border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 shadow-sm shrink-0 whitespace-nowrap"
-              title="선택 또는 현재 목록 인원 일정 및 부서 일괄 관리"
+              className={`text-xs px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 cursor-pointer transition-all border shadow-sm shrink-0 whitespace-nowrap ${
+                selectedUids.length > 0
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-400 shadow-blue-900/40'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+              }`}
+              title={selectedUids.length > 0 ? `선택된 ${selectedUids.length}명의 일정 및 부서 일괄 관리` : "전체 목록 대상자의 일정 및 부서 일괄 관리"}
             >
-              <CalendarCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <CalendarCheck className="w-3.5 h-3.5 shrink-0" />
               <span>일정·부서 일괄 관리</span>
             </button>
+            {selectedUids.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedUids([])}
+                className="text-[11px] px-2 py-1 rounded-md font-medium text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 cursor-pointer whitespace-nowrap transition-colors"
+                title="선택 해제"
+              >
+                선택 해제
+              </button>
+            )}
           </div>
         </div>
         <div className="flex-1 overflow-x-auto overflow-y-auto dx-table-wrapper border-0 rounded-none w-full relative">
